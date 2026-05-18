@@ -1,0 +1,64 @@
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+pyproject.toml.lock
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.tox/
+.cache/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.manifest
+*.spec
+*.log
+
+# Virtual environment directories
+.venv/
+venv/
+ENV/
+
+# IDE/editor directories
+.vscode/
+.idea/
+*.iml
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Redis
+redis_data/
+
+# RQ
+rq_worker.log
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
