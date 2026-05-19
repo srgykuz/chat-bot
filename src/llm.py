@@ -14,16 +14,14 @@ class LLMClient:
         self.settings = get_settings()
         self.provider = None
         self.openai = None
-        self.openai_client = None
 
         if self.settings.openai_api_key:
             try:
                 import openai
             except ImportError as exc:
                 raise RuntimeError("OpenAI SDK is not installed. Add openai to requirements.") from exc
-            openai.api_key = self.settings.openai_api_key
-            self.openai = openai
-            self.openai_client = openai.OpenAI(api_key=self.settings.openai_api_key)
+
+            self.openai = openai.OpenAI(api_key=self.settings.openai_api_key)
             self.provider = "openai"
 
         elif self.settings.gemini_api_key:
@@ -53,10 +51,10 @@ class LLMClient:
         return await asyncio.to_thread(self._openai_call, messages)
 
     def _openai_call(self, messages: List[Dict[str, str]]) -> str:
-        if not self.openai_client:
+        if not self.openai:
             raise RuntimeError("OpenAI client is not initialized.")
 
-        completion = self.openai_client.chat.completions.create(
+        completion = self.openai.chat.completions.create(
             model="gpt-5-mini",
             messages=messages, # type: ignore
             temperature=1,
