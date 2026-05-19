@@ -34,6 +34,8 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         logger.info(f"Processed command for {message_info['username']}")
         return message_info
 
+    await telegram_handler.send_chat_action(chat_id, action="typing")
+
     persona = session_store.ensure_persona(chat_id, user_name=message_info.get("first_name"))
     session_store.append_message(chat_id, "user", text)
     history = session_store.get_history(chat_id)

@@ -45,6 +45,20 @@ class TelegramHandler:
             print(f"Error sending message: {e}")
             raise
 
+    async def send_chat_action(self, chat_id: int, action: str = "typing") -> Dict[str, Any]:
+        """Send a chat action to Telegram, such as typing."""
+        try:
+            response = await self.client.post(
+                f"{self.api_url}/sendChatAction",
+                json={"chat_id": chat_id, "action": action},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            print(f"Error sending chat action: {e}")
+            raise
+
     async def set_webhook(self, url: str) -> Dict[str, Any]:
         """Set webhook URL for receiving updates.
 
