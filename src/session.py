@@ -67,6 +67,25 @@ class SessionStore:
     def clear_history(self, chat_id: int) -> None:
         self.redis.delete(self._history_key(chat_id))
 
+    def delete_persona(self, chat_id: int) -> None:
+        self.redis.delete(self._persona_key(chat_id))
+
+    def get_history_info(self, chat_id: int) -> Dict[str, int]:
+        history = self.get_history(chat_id)
+        num_user = sum(1 for message in history if message.get("role") == "user")
+        num_assistant = sum(1 for message in history if message.get("role") == "assistant")
+
+        return {
+            "num_messages": len(history),
+            "max_history_messages": self.MAX_HISTORY_MESSAGES,
+            "num_user_messages": num_user,
+            "num_assistant_messages": num_assistant,
+        }
+
+    def clear(self, chat_id: int) -> None:
+        self.delete_persona(chat_id)
+        self.clear_history(chat_id)
+
     def _create_persona(self, user_name: Optional[str]) -> Dict[str, Any]:
         names = ["Anna", "Max", "Mira", "Leo", "Sasha", "Noa", "Jamie", "Finn"]
         tones = [
