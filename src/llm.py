@@ -55,10 +55,12 @@ class LLMClient:
             raise RuntimeError("OpenAI client is not initialized.")
 
         completion = self.openai.chat.completions.create(
-            model="gpt-5-mini",
+            model="gpt-5.4",
             messages=messages, # type: ignore
-            temperature=1,
-            max_completion_tokens=1000,
-            #top_p=0.95,
+            temperature=0.8,
+            max_completion_tokens=500,
+            top_p=0.9,
+            presence_penalty=0.2,
+            frequency_penalty=0.2,
         )
         return (completion.choices[0].message.content or "").strip()
