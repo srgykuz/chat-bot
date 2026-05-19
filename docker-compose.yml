@@ -27,6 +27,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - REDIS_URL=redis://redis:6379
+      - SYSTEM_PROMPT_TEMPLATE_PATH=${SYSTEM_PROMPT_TEMPLATE_PATH:-./llm/system.txt}
       - ENVIRONMENT=production
     depends_on:
       redis:
@@ -43,6 +44,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - REDIS_URL=redis://redis:6379
+      - SYSTEM_PROMPT_TEMPLATE_PATH=${SYSTEM_PROMPT_TEMPLATE_PATH:-./llm/system.txt}
       - ENVIRONMENT=production
     depends_on:
       redis:

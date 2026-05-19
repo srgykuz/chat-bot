@@ -1,6 +1,7 @@
 """LLM integration for generating friend-like responses."""
 import asyncio
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from src.config import get_settings
 
@@ -14,6 +15,12 @@ class LLMClient:
         self.settings = get_settings()
         self.provider = None
         self.openai = None
+        self.system_prompt_template_path = Path(self.settings.system_prompt_template_path)
+
+        if not self.system_prompt_template_path.is_absolute():
+            self.system_prompt_template_path = (
+                Path(__file__).resolve().parents[1] / self.system_prompt_template_path
+            )
 
         if self.settings.openai_api_key:
             try:
@@ -42,10 +49,20 @@ class LLMClient:
         return await self._openai_chat(messages)
 
     def _build_system_prompt(self, persona: Dict[str, Any]) -> str:
-        return (
-            f"You are {persona['name']}, a {persona['tone']} virtual friend. "
-            f"{persona['description']}"
-        )
+        template = self._load_system_prompt_template()
+        try:
+            return template.format_map(persona)
+        except KeyError as exc:
+            raise RuntimeError(
+                f"System prompt template is missing persona field: {exc.args[0]}"
+            ) from exc
+
+    def _load_system_prompt_template(self) -> str:
+        if not self.system_prompt_template_path.exists():
+            raise RuntimeError(
+                f"System prompt template not found: {self.system_prompt_template_path}"
+            )
+        return self.system_prompt_template_path.read_text(encoding="utf-8")
 
     async def _openai_chat(self, messages: List[Dict[str, str]]) -> str:
         return await asyncio.to_thread(self._openai_call, messages)

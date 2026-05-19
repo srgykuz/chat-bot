@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # LLM APIs
     gemini_api_key: str = ""
     openai_api_key: str = ""
+    system_prompt_template_path: str = "./llm/system.txt"
 
     # Redis
     redis_url: str = "redis://localhost:6379"
