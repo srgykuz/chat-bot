@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     openai_api_key: str = ""
     system_prompt_template_path: str = "./llm/system.txt"
+    llm_params_path: str = "./llm/params.json"
 
     # Redis
     redis_url: str = "redis://localhost:6379"

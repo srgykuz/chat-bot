@@ -1,6 +1,7 @@
 """LLM integration for generating friend-like responses."""
 import asyncio
 import logging
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from src.config import get_settings
@@ -16,11 +17,15 @@ class LLMClient:
         self.provider = None
         self.openai = None
         self.system_prompt_template_path = Path(self.settings.system_prompt_template_path)
+        self.llm_params_path = Path(self.settings.llm_params_path)
 
         if not self.system_prompt_template_path.is_absolute():
             self.system_prompt_template_path = (
                 Path(__file__).resolve().parents[1] / self.system_prompt_template_path
             )
+
+        if not self.llm_params_path.is_absolute():
+            self.llm_params_path = Path(__file__).resolve().parents[1] / self.llm_params_path
 
         if self.settings.openai_api_key:
             try:
@@ -64,6 +69,21 @@ class LLMClient:
             )
         return self.system_prompt_template_path.read_text(encoding="utf-8")
 
+    def _load_llm_params(self) -> Dict[str, Any]:
+        try:
+            if not self.llm_params_path.exists():
+                raise RuntimeError(f"LLM params file not found: {self.llm_params_path}")
+
+            raw = self.llm_params_path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+
+            if not isinstance(data, dict):
+                raise RuntimeError("LLM params file must contain a JSON object at the top level.")
+
+            return data
+        except Exception:
+            raise RuntimeError(f"Error occurred while loading LLM params from {self.llm_params_path}")
+
     async def _openai_chat(self, messages: List[Dict[str, str]]) -> str:
         return await asyncio.to_thread(self._openai_call, messages)
 
@@ -71,13 +91,27 @@ class LLMClient:
         if not self.openai:
             raise RuntimeError("OpenAI client is not initialized.")
 
-        completion = self.openai.chat.completions.create(
-            model="gpt-5.4",
-            messages=messages, # type: ignore
-            temperature=0.8,
-            max_completion_tokens=500,
-            top_p=0.9,
-            presence_penalty=0.2,
-            frequency_penalty=0.2,
-        )
+        params = self._load_llm_params()
+
+        # build kwargs for the OpenAI call, only include known keys
+        allowed_keys = {
+            "model",
+            "temperature",
+            "max_completion_tokens",
+            "top_p",
+            "presence_penalty",
+            "frequency_penalty",
+        }
+        call_kwargs: Dict[str, Any] = {}
+
+        for k in allowed_keys:
+            if k in params and params[k] is not None:
+                call_kwargs[k] = params[k]
+
+        # messages handled separately
+        call_kwargs["messages"] = messages
+        completion = self.openai.chat.completions.create(**call_kwargs)
+
+        logger.info(f"LLM response received with params: {call_kwargs}")
+
         return (completion.choices[0].message.content or "").strip()
