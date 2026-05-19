@@ -1,6 +1,6 @@
 """Session storage and persona management for Friend Bot."""
 import json
-import hashlib
+import random
 from typing import Any, Dict, List, Optional, Union, cast
 from redis import Redis
 from src.config import get_settings
@@ -42,7 +42,7 @@ class SessionStore:
         if persona is not None:
             return persona
 
-        persona = self._create_persona(chat_id, user_name)
+        persona = self._create_persona(user_name)
         self.save_persona(chat_id, persona)
         return persona
 
@@ -67,7 +67,7 @@ class SessionStore:
     def clear_history(self, chat_id: int) -> None:
         self.redis.delete(self._history_key(chat_id))
 
-    def _create_persona(self, chat_id: int, user_name: Optional[str]) -> Dict[str, Any]:
+    def _create_persona(self, user_name: Optional[str]) -> Dict[str, Any]:
         names = ["Anna", "Max", "Mira", "Leo", "Sasha", "Noa", "Jamie", "Finn"]
         tones = [
             "warm and witty",
@@ -83,9 +83,9 @@ class SessionStore:
             "trying new recipes",
             "going for evening walks",
         ]
-        name = names[chat_id % len(names)]
-        tone = tones[chat_id % len(tones)]
-        hobby = hobbies[chat_id % len(hobbies)]
+        name = random.choice(names)
+        tone = random.choice(tones)
+        hobby = random.choice(hobbies)
         user_hint = f" and likes talking to {user_name}" if user_name else ""
 
         description = (
@@ -94,12 +94,8 @@ class SessionStore:
             "They keep the conversation human, do not mention they are an AI, and they remember the most recent topics."
         )
 
-        seed = hashlib.sha256(str(chat_id).encode()).hexdigest()[:8]
-        identity = f"{name}#{seed}"
-
         return {
             "name": name,
-            "identity": identity,
             "tone": tone,
             "hobby": hobby,
             "description": description,
