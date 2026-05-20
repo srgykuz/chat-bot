@@ -19,6 +19,7 @@ class TelegramPoller:
         self.offset: Optional[int] = None
         self.timeout = 30
         self.limit = 100
+        self.pending_tasks: list[asyncio.Task[Dict | None]] = []
 
     async def start(self) -> None:
         """Start polling and handling updates."""
@@ -32,15 +33,22 @@ class TelegramPoller:
                     limit=self.limit,
                 )
 
+                self._cleanup_done_tasks()
+
                 updates = payload.get("result", []) or []
                 if not updates:
                     continue
 
+                latest_id = max(
+                    (update.get("update_id") for update in updates if update.get("update_id") is not None),
+                    default=None,
+                )
+                if latest_id is not None:
+                    self.offset = latest_id + 1
+
                 for update in updates:
-                    await process_update(update)
-                    update_id = update.get("update_id")
-                    if update_id is not None:
-                        self.offset = update_id + 1
+                    task = asyncio.create_task(process_update(update))
+                    self.pending_tasks.append(task)
 
             except asyncio.CancelledError:
                 logger.info("Telegram polling task cancelled")
@@ -48,6 +56,18 @@ class TelegramPoller:
             except Exception as exc:
                 logger.error("Telegram polling error: %s", exc, exc_info=True)
                 await asyncio.sleep(5)
+
+    def _cleanup_done_tasks(self) -> None:
+        """Remove completed tasks and log exceptions."""
+        still_pending: list[asyncio.Task[Dict | None]] = []
+        for task in self.pending_tasks:
+            if task.done():
+                exc = task.exception()
+                if exc is not None:
+                    logger.error("Error handling update task: %s", exc, exc_info=True)
+            else:
+                still_pending.append(task)
+        self.pending_tasks = still_pending
 
 
 if __name__ == "__main__":
