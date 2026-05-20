@@ -88,6 +88,13 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
             return f"Persona set to {name}."
         return f"Persona {name} not found."
 
+    if command == "/list_persona":
+        names = session_store.list_persona_names()
+        if not names:
+            return "No personas available."
+        names = [f"`{n}`" for n in names]
+        return "*Available personas:*\n" + "\n".join(names)
+
     if command == "/get_history":
         info = session_store.get_history_info(chat_id)
         return (
@@ -110,6 +117,7 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
         "Persona commands:\n"
         "/set\\_persona <Name>\n"
         "/get\\_persona\n"
+        "/list\\_persona\n"
         "/clear\\_persona\n"
         "\n"
         "History commands:\n"

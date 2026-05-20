@@ -87,6 +87,10 @@ class SessionStore:
     def save_persona(self, chat_id: int, persona: Dict[str, Any]) -> None:
         self.redis.set(self._persona_key(chat_id), json.dumps(persona))
 
+    def list_persona_names(self) -> List[str]:
+        """Return a list of available persona names from the catalog."""
+        return [str(p.get("name")) for p in self._personas if p.get("name")]
+
     def set_persona(self, chat_id: int, persona_name: str, user_name: Optional[str] = None) -> bool:
         """Set a specific persona for the chat by name.
 
