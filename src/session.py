@@ -60,6 +60,21 @@ class SessionStore:
         if not isinstance(data, list):
             raise RuntimeError("Persona catalog must be a JSON list of persona objects.")
 
+        # Validate persona entries and ensure unique names
+        seen: set = set()
+        for idx, entry in enumerate(data):
+            if not isinstance(entry, dict):
+                raise RuntimeError(f"Persona entry at index {idx} is not an object")
+
+            name = entry.get("name")
+            if not isinstance(name, str) or not name.strip():
+                raise RuntimeError(f"Persona entry at index {idx} missing valid 'name' field")
+
+            key = name.strip().lower()
+            if key in seen:
+                raise RuntimeError(f"Duplicate persona name found: {name}")
+            seen.add(key)
+
         return data
 
     def _load_persona_template(self) -> str:
