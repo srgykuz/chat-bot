@@ -1,10 +1,10 @@
 {
-    "model": "gpt-5.4",
-    "temperature": 0.8,
-    "max_completion_tokens": 500,
+    "model": "gpt-4o",
+    "temperature": 0.9,
+    "max_completion_tokens": 250,
     "top_p": 0.9,
     "presence_penalty": 0.2,
     "frequency_penalty": 0.2,
     "reasoning_effort": "",
-    "verbosity": "low"
+    "verbosity": ""
 }
