@@ -38,16 +38,20 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     await telegram_handler.send_chat_action(chat_id, action="typing")
 
     persona = session_store.ensure_persona(chat_id, user_name=message_info.get("first_name"))
-    session_store.append_message(chat_id, "user", text)
     history = session_store.get_history(chat_id)
+    generated = False
 
     try:
         response_text = await llm_client.chat_with_friend(persona, history)
+        generated = True
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc, exc_info=True)
+        generated = False
         response_text = "Sorry, I couldn't think of a good answer right now. Let's keep talking!"
 
-    session_store.append_message(chat_id, "assistant", response_text)
+    if generated:
+        session_store.append_message(chat_id, "user", text)
+        session_store.append_message(chat_id, "assistant", response_text)
 
     await telegram_handler.send_message(
         chat_id=chat_id,
