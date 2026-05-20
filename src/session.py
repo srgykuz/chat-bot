@@ -1,6 +1,7 @@
 """Session storage and persona management for Friend Bot."""
 import json
 import random
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, cast
 from redis import Redis
 from src.config import get_settings
@@ -17,6 +18,21 @@ class SessionStore:
         self.redis = Redis.from_url(settings.redis_url, decode_responses=True)
         self.max_history_messages = settings.max_history_messages
 
+        self.persona_catalog_path = Path(settings.persona_catalog_path)
+        self.persona_template_path = Path(settings.persona_template_path)
+
+        if not self.persona_catalog_path.is_absolute():
+            self.persona_catalog_path = (
+                Path(__file__).resolve().parents[1] / self.persona_catalog_path
+            )
+        if not self.persona_template_path.is_absolute():
+            self.persona_template_path = (
+                Path(__file__).resolve().parents[1] / self.persona_template_path
+            )
+
+        self._personas = self._load_personas()
+        self._persona_template = self._load_persona_template()
+
     def _persona_key(self, chat_id: int) -> str:
         return f"session:{chat_id}:persona"
 
@@ -32,6 +48,26 @@ class SessionStore:
             raw = raw.decode()
 
         return json.loads(raw)
+
+    def _load_personas(self) -> List[Dict[str, Any]]:
+        if not self.persona_catalog_path.exists():
+            raise RuntimeError(
+                f"Persona catalog not found: {self.persona_catalog_path}"
+            )
+
+        raw = self.persona_catalog_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        if not isinstance(data, list):
+            raise RuntimeError("Persona catalog must be a JSON list of persona objects.")
+
+        return data
+
+    def _load_persona_template(self) -> str:
+        if not self.persona_template_path.exists():
+            raise RuntimeError(
+                f"Persona template not found: {self.persona_template_path}"
+            )
+        return self.persona_template_path.read_text(encoding="utf-8")
 
     def save_persona(self, chat_id: int, persona: Dict[str, Any]) -> None:
         self.redis.set(self._persona_key(chat_id), json.dumps(persona))
@@ -86,35 +122,13 @@ class SessionStore:
         self.clear_history(chat_id)
 
     def _create_persona(self, user_name: Optional[str]) -> Dict[str, Any]:
-        names = ["Anna", "Max", "Mira", "Leo", "Sasha", "Noa", "Jamie", "Finn"]
-        tones = [
-            "warm and witty",
-            "calm and supportive",
-            "thoughtful and curious",
-            "playful and encouraging",
-        ]
-        hobbies = [
-            "reading new novels",
-            "exploring local cafes",
-            "drawing small sketches",
-            "watching indie movies",
-            "trying new recipes",
-            "going for evening walks",
-        ]
-        name = random.choice(names)
-        tone = random.choice(tones)
-        hobby = random.choice(hobbies)
-        user_hint = f" and likes talking to {user_name}" if user_name else ""
-
-        description = (
-            f"{name} is a {tone} virtual friend who listens closely and responds like a real person. "
-            f"They enjoy {hobby}{user_hint}. "
-            "They keep the conversation human, do not mention they are an AI, and they remember the most recent topics."
-        )
-
-        return {
-            "name": name,
-            "tone": tone,
-            "hobby": hobby,
-            "description": description,
+        persona = random.choice(self._personas)
+        persona = {
+            "name": persona.get("name"),
+            "tone": persona.get("tone"),
+            "hobby": persona.get("hobby"),
         }
+        persona["user_hint"] = f" and likes talking to {user_name}" if user_name else ""
+        persona["description"] = self._persona_template.format_map(persona)
+
+        return persona

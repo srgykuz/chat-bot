@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     system_prompt_template_path: str = "./llm/system.txt"
     llm_params_path: str = "./llm/params.json"
+    persona_catalog_path: str = "./llm/personas.json"
+    persona_template_path: str = "./llm/persona.txt"
 
     # Redis
     redis_url: str = "redis://localhost:6379"
