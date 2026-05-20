@@ -77,6 +77,17 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
         session_store.clear_persona(chat_id)
         return "Persona cleared. A new persona will be created on the next message."
 
+    if command == "/set_persona":
+        parts = text.split(maxsplit=1)
+        if len(parts) < 2 or not parts[1].strip():
+            return "Usage: /set\\_persona <Name>"
+
+        name = parts[1].strip()
+        success = session_store.set_persona(chat_id, name, user_name)
+        if success:
+            return f"Persona set to {name}."
+        return f"Persona {name} not found."
+
     if command == "/get_history":
         info = session_store.get_history_info(chat_id)
         return (
@@ -97,6 +108,7 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
 
     return (
         "Persona commands:\n"
+        "/set\\_persona <Name>\n"
         "/get\\_persona\n"
         "/clear\\_persona\n"
         "\n"

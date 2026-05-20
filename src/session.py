@@ -72,6 +72,19 @@ class SessionStore:
     def save_persona(self, chat_id: int, persona: Dict[str, Any]) -> None:
         self.redis.set(self._persona_key(chat_id), json.dumps(persona))
 
+    def set_persona(self, chat_id: int, persona_name: str, user_name: Optional[str] = None) -> bool:
+        """Set a specific persona for the chat by name.
+
+        Returns True if the persona was found and saved, False otherwise.
+        """
+        try:
+            persona = self._create_persona(user_name=user_name, persona_name=persona_name)
+        except ValueError:
+            return False
+
+        self.save_persona(chat_id, persona)
+        return True
+
     def ensure_persona(self, chat_id: int, user_name: Optional[str] = None) -> Dict[str, Any]:
         persona = self.get_persona(chat_id)
         if persona is not None:
@@ -121,12 +134,30 @@ class SessionStore:
         self.clear_persona(chat_id)
         self.clear_history(chat_id)
 
-    def _create_persona(self, user_name: Optional[str]) -> Dict[str, Any]:
-        persona = random.choice(self._personas)
+    def _create_persona(self, user_name: Optional[str], persona_name: Optional[str] = None) -> Dict[str, Any]:
+        """Create a persona dictionary.
+
+        If `persona_name` is provided, attempt to use that persona from the catalog;
+        otherwise choose a random persona.
+        """
+        source: Dict[str, Any]
+        if persona_name:
+            match = None
+            for p in self._personas:
+                if str(p.get("name", "")).lower() == persona_name.strip().lower():
+                    match = p
+                    break
+            if match is None:
+                # Explicitly error if requested persona name not found
+                raise ValueError(f"Persona not found: {persona_name}")
+            source = match
+        else:
+            source = random.choice(self._personas)
+
         persona = {
-            "name": persona.get("name"),
-            "tone": persona.get("tone"),
-            "hobby": persona.get("hobby"),
+            "name": source.get("name"),
+            "tone": source.get("tone"),
+            "hobby": source.get("hobby"),
         }
         persona["user_hint"] = f" and likes talking to {user_name}" if user_name else ""
         persona["description"] = self._persona_template.format_map(persona)
