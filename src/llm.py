@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import json
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from src.config import get_settings
@@ -55,8 +56,12 @@ class LLMClient:
 
     def _build_system_prompt(self, persona: Dict[str, Any]) -> str:
         template = self._load_system_prompt_template()
+        mapping = {
+            "current_time": datetime.now(tz=timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"),
+            **persona
+        }
         try:
-            return template.format_map(persona)
+            return template.format_map(mapping)
         except KeyError as exc:
             raise RuntimeError(
                 f"System prompt template is missing persona field: {exc.args[0]}"
