@@ -96,10 +96,14 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
         return "Session cleared: persona and history removed."
 
     return (
-        "Available commands:\n"
+        "Persona commands:\n"
         "/get\\_persona\n"
         "/clear\\_persona\n"
+        "\n"
+        "History commands:\n"
         "/get\\_history\n"
         "/clear\\_history\n"
+        "\n"
+        "Other commands:\n"
         "/clear"
     )
