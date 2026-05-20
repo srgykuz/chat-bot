@@ -34,6 +34,12 @@ class TelegramHandler:
             resp_text,
         )
 
+    def _escape_markdown(self, text: str) -> str:
+        """Escape Markdown special characters supported by Telegram."""
+        for char in ("_", "*", "`", "["):
+            text = text.replace(char, f"\\{char}")
+        return text
+
     async def send_message(self, chat_id: int, text: str, reply_to_message_id: Optional[int] = None) -> Dict[str, Any]:
         """Send a message to a Telegram chat.
 
@@ -47,7 +53,7 @@ class TelegramHandler:
         """
         payload = {
             "chat_id": chat_id,
-            "text": text,
+            "text": self._escape_markdown(text),
             "parse_mode": "Markdown",
         }
 

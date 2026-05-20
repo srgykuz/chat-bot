@@ -85,7 +85,7 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
     if command == "/set_persona":
         parts = text.split(maxsplit=1)
         if len(parts) < 2 or not parts[1].strip():
-            return "Usage: /set\\_persona <Name>"
+            return "Usage: /set_persona <Name>"
 
         name = parts[1].strip()
         success = session_store.set_persona(chat_id, name, user_name)
@@ -120,14 +120,14 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
 
     return (
         "Persona commands:\n"
-        "/set\\_persona <Name>\n"
-        "/get\\_persona\n"
-        "/list\\_persona\n"
-        "/clear\\_persona\n"
+        "/set_persona <Name>\n"
+        "/get_persona\n"
+        "/list_persona\n"
+        "/clear_persona\n"
         "\n"
         "History commands:\n"
-        "/get\\_history\n"
-        "/clear\\_history\n"
+        "/get_history\n"
+        "/clear_history\n"
         "\n"
         "Other commands:\n"
         "/clear"
