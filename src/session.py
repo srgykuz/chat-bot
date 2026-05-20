@@ -102,7 +102,7 @@ class SessionStore:
     def clear_history(self, chat_id: int) -> None:
         self.redis.delete(self._history_key(chat_id))
 
-    def delete_persona(self, chat_id: int) -> None:
+    def clear_persona(self, chat_id: int) -> None:
         self.redis.delete(self._persona_key(chat_id))
 
     def get_history_info(self, chat_id: int) -> Dict[str, int]:
@@ -118,7 +118,7 @@ class SessionStore:
         }
 
     def clear(self, chat_id: int) -> None:
-        self.delete_persona(chat_id)
+        self.clear_persona(chat_id)
         self.clear_history(chat_id)
 
     def _create_persona(self, user_name: Optional[str]) -> Dict[str, Any]:

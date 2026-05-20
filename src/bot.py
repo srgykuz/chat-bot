@@ -73,8 +73,8 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
             f"Description: `{persona.get('description')}`"
         )
 
-    if command == "/delete_persona":
-        session_store.delete_persona(chat_id)
+    if command == "/clear_persona":
+        session_store.clear_persona(chat_id)
         return "Persona cleared. A new persona will be created on the next message."
 
     if command == "/get_history":
@@ -98,7 +98,7 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
     return (
         "Available commands:\n"
         "/get\\_persona\n"
-        "/delete\\_persona\n"
+        "/clear\\_persona\n"
         "/get\\_history\n"
         "/clear\\_history\n"
         "/clear"
