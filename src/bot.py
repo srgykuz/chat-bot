@@ -21,8 +21,9 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
 
     chat_id = message_info["chat_id"]
+    update_id = message_info.get("update_id")
     text = message_info["text"].strip()
-    logger.info(f"Processing message from {message_info['username']}: {text}")
+    logger.info(f"Processing update {update_id} from {message_info['username']}: {text}")
 
     if text.startswith("/"):
         response_text = await _handle_command(chat_id, text, message_info["first_name"])
@@ -31,7 +32,7 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             text=response_text,
             reply_to_message_id=message_info["message_id"],
         )
-        logger.info(f"Processed command for {message_info['username']}")
+        logger.info(f"Processed command for update {update_id} from {message_info['username']}")
         return message_info
 
     await telegram_handler.send_chat_action(chat_id, action="typing")
@@ -53,7 +54,7 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         text=response_text
     )
 
-    logger.info(f"Sent response to {message_info['username']}")
+    logger.info(f"Sent response for update {update_id} to {message_info['username']}")
     return message_info
 
 

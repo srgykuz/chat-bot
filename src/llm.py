@@ -113,5 +113,14 @@ class LLMClient:
         # messages handled separately
         call_kwargs["messages"] = messages
         completion = self.openai.chat.completions.create(**call_kwargs)
+        output = (completion.choices[0].message.content or "").strip()
 
-        return (completion.choices[0].message.content or "").strip()
+        call_kwargs.pop("messages", None)  # remove messages from kwargs for cleaner logging
+        logger.info(
+            "OpenAI call model=%s args=%s usage=%s",
+            getattr(completion, "model", None),
+            call_kwargs,
+            getattr(completion, "usage", None),
+        )
+
+        return output

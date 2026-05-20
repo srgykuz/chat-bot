@@ -9,7 +9,10 @@ from src.bot import process_update
 from src.poller import TelegramPoller
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Friend Bot", version="0.1.0")
