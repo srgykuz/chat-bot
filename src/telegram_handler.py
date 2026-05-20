@@ -1,7 +1,10 @@
 """Telegram API handler for sending and receiving messages."""
+import logging
 import httpx
 from typing import Optional, Dict, Any
 from src.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramHandler:
@@ -12,6 +15,24 @@ class TelegramHandler:
         self.token = self.settings.telegram_token
         self.api_url = f"https://api.telegram.org/bot{self.token}"
         self.client = httpx.AsyncClient()
+
+    def _log_http_error(self, e: Exception, request: object) -> None:
+        """Log an httpx error with request payload and response details."""
+        resp = getattr(e, "response", None)
+        resp_text = None
+        try:
+            if resp is not None:
+                resp_text = resp.text
+        except Exception:
+            resp_text = None
+
+        logger.exception(
+            "Telegram API error: %s; request=%s; response_status=%s; response_text=%s",
+            e,
+            request,
+            getattr(resp, "status_code", None),
+            resp_text,
+        )
 
     async def send_message(self, chat_id: int, text: str, reply_to_message_id: Optional[int] = None) -> Dict[str, Any]:
         """Send a message to a Telegram chat.
@@ -42,21 +63,22 @@ class TelegramHandler:
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            print(f"Error sending message: {e}")
+            self._log_http_error(e, payload)
             raise
 
     async def send_chat_action(self, chat_id: int, action: str = "typing") -> Dict[str, Any]:
         """Send a chat action to Telegram, such as typing."""
+        payload = {"chat_id": chat_id, "action": action}
         try:
             response = await self.client.post(
                 f"{self.api_url}/sendChatAction",
-                json={"chat_id": chat_id, "action": action},
+                json=payload,
                 timeout=10.0,
             )
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            print(f"Error sending chat action: {e}")
+            self._log_http_error(e, payload)
             raise
 
     async def set_webhook(self, url: str) -> Dict[str, Any]:
@@ -68,16 +90,17 @@ class TelegramHandler:
         Returns:
             API response
         """
+        payload = {"url": url}
         try:
             response = await self.client.post(
                 f"{self.api_url}/setWebhook",
-                json={"url": url},
+                json=payload,
                 timeout=10.0
             )
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            print(f"Error setting webhook: {e}")
+            self._log_http_error(e, payload)
             raise
 
     async def get_webhook_info(self) -> Dict[str, Any]:
@@ -94,7 +117,7 @@ class TelegramHandler:
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            print(f"Error getting webhook info: {e}")
+            self._log_http_error(e, {"url": f"{self.api_url}/getWebhookInfo"})
             raise
 
     async def get_updates(self, offset: Optional[int] = None, timeout: int = 30, limit: int = 100) -> Dict[str, Any]:
@@ -124,7 +147,7 @@ class TelegramHandler:
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            print(f"Error fetching updates: {e}")
+            self._log_http_error(e, payload)
             raise
 
 
