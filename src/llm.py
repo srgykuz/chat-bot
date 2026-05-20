@@ -101,6 +101,8 @@ class LLMClient:
             "top_p",
             "presence_penalty",
             "frequency_penalty",
+            "reasoning_effort",
+            "verbosity",
         }
         call_kwargs: Dict[str, Any] = {}
 

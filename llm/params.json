@@ -4,5 +4,7 @@
     "max_completion_tokens": 500,
     "top_p": 0.9,
     "presence_penalty": 0.2,
-    "frequency_penalty": 0.2
+    "frequency_penalty": 0.2,
+    "reasoning_effort": "low",
+    "verbosity": "low"
 }
