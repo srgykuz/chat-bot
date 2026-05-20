@@ -12,11 +12,10 @@ RedisValue = Union[str, bytes]
 class SessionStore:
     """Manage per-user conversation history and persona storage."""
 
-    MAX_HISTORY_MESSAGES = 12
-
     def __init__(self) -> None:
         settings = get_settings()
         self.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        self.max_history_messages = settings.max_history_messages
 
     def _persona_key(self, chat_id: int) -> str:
         return f"session:{chat_id}:persona"
@@ -49,10 +48,10 @@ class SessionStore:
     def append_message(self, chat_id: int, role: str, content: str) -> None:
         message = {"role": role, "content": content}
         self.redis.rpush(self._history_key(chat_id), json.dumps(message))
-        self.redis.ltrim(self._history_key(chat_id), -self.MAX_HISTORY_MESSAGES, -1)
+        self.redis.ltrim(self._history_key(chat_id), -self.max_history_messages, -1)
 
     def get_history(self, chat_id: int) -> List[Dict[str, Any]]:
-        raw_items = cast(List[RedisValue], self.redis.lrange(self._history_key(chat_id), -self.MAX_HISTORY_MESSAGES, -1))
+        raw_items = cast(List[RedisValue], self.redis.lrange(self._history_key(chat_id), -self.max_history_messages, -1))
         history: List[Dict[str, Any]] = []
 
         for item in raw_items:
@@ -77,7 +76,7 @@ class SessionStore:
 
         return {
             "num_messages": len(history),
-            "max_history_messages": self.MAX_HISTORY_MESSAGES,
+            "max_history_messages": self.max_history_messages,
             "num_user_messages": num_user,
             "num_assistant_messages": num_assistant,
         }

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379"
 
+    # History
+    max_history_messages: int = 12
+
     # Environment
     environment: str = "development"
 
