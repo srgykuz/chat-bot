@@ -50,8 +50,7 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     await telegram_handler.send_message(
         chat_id=chat_id,
-        text=response_text,
-        reply_to_message_id=message_info["message_id"],
+        text=response_text
     )
 
     logger.info(f"Sent response to {message_info['username']}")
