@@ -112,6 +112,4 @@ class LLMClient:
         call_kwargs["messages"] = messages
         completion = self.openai.chat.completions.create(**call_kwargs)
 
-        logger.info(f"LLM response received with params: {call_kwargs}")
-
         return (completion.choices[0].message.content or "").strip()
