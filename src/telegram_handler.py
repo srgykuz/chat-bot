@@ -40,20 +40,24 @@ class TelegramHandler:
             text = text.replace(char, f"\\{char}")
         return text
 
-    async def send_message(self, chat_id: int, text: str, reply_to_message_id: Optional[int] = None) -> Dict[str, Any]:
+    async def send_message(self, chat_id: int, text: str, reply_to_message_id: Optional[int] = None, escape: bool = True) -> Dict[str, Any]:
         """Send a message to a Telegram chat.
 
         Args:
             chat_id: Telegram chat ID
             text: Message text
             reply_to_message_id: Optional message ID to reply to
+            escape: Whether to escape Markdown special characters
 
         Returns:
             API response
         """
+        if escape:
+            text = self._escape_markdown(text)
+
         payload = {
             "chat_id": chat_id,
-            "text": self._escape_markdown(text),
+            "text": text,
             "parse_mode": "Markdown",
         }
 
