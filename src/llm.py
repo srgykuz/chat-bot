@@ -107,8 +107,16 @@ class LLMClient:
         call_kwargs: Dict[str, Any] = {}
 
         for k in allowed_keys:
-            if k in params and params[k] is not None:
-                call_kwargs[k] = params[k]
+            if k not in params:
+                continue
+
+            if params[k] is None:
+                continue  # skip null values
+
+            if isinstance(params[k], str) and not params[k].strip():
+                continue  # skip empty string values
+
+            call_kwargs[k] = params[k]
 
         # messages handled separately
         call_kwargs["messages"] = messages
