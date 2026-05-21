@@ -70,9 +70,6 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
         return (
             "*Current persona:*\n"
             f"Name: `{persona.get('name')}`\n"
-            f"Tone: `{persona.get('tone')}`\n"
-            f"Hobby: `{persona.get('hobby')}`\n"
-            f"Description: `{persona.get('description')}`"
         )
 
     if command == "/clear_persona":
