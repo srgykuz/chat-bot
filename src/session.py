@@ -18,20 +18,14 @@ class SessionStore:
         self.redis = Redis.from_url(settings.redis_url, decode_responses=True)
         self.max_history_messages = settings.max_history_messages
 
-        self.persona_catalog_path = Path(settings.persona_catalog_path)
-        self.persona_template_path = Path(settings.persona_template_path)
+        self.persona_folder_path = Path(settings.persona_folder_path)
 
-        if not self.persona_catalog_path.is_absolute():
-            self.persona_catalog_path = (
-                Path(__file__).resolve().parents[1] / self.persona_catalog_path
-            )
-        if not self.persona_template_path.is_absolute():
-            self.persona_template_path = (
-                Path(__file__).resolve().parents[1] / self.persona_template_path
+        if not self.persona_folder_path.is_absolute():
+            self.persona_folder_path = (
+                Path(__file__).resolve().parents[1] / self.persona_folder_path
             )
 
         self._personas = self._load_personas()
-        self._persona_template = self._load_persona_template()
 
     def _persona_key(self, chat_id: int) -> str:
         return f"session:{chat_id}:persona"
@@ -50,46 +44,41 @@ class SessionStore:
         return json.loads(raw)
 
     def _load_personas(self) -> List[Dict[str, Any]]:
-        if not self.persona_catalog_path.exists():
+        if not self.persona_folder_path.exists() or not self.persona_folder_path.is_dir():
             raise RuntimeError(
-                f"Persona catalog not found: {self.persona_catalog_path}"
+                f"Persona folder not found: {self.persona_folder_path}"
             )
 
-        raw = self.persona_catalog_path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        if not isinstance(data, list):
-            raise RuntimeError("Persona catalog must be a JSON list of persona objects.")
+        personas: List[Dict[str, Any]] = []
 
-        # Validate persona entries and ensure unique names
-        seen: set = set()
-        for idx, entry in enumerate(data):
-            if not isinstance(entry, dict):
-                raise RuntimeError(f"Persona entry at index {idx} is not an object")
+        for persona_file in sorted(self.persona_folder_path.glob("*.txt")):
+            if not persona_file.is_file():
+                continue
 
-            name = entry.get("name")
-            if not isinstance(name, str) or not name.strip():
-                raise RuntimeError(f"Persona entry at index {idx} missing valid 'name' field")
+            name = persona_file.stem.strip()
+            if not name:
+                raise RuntimeError(f"Persona file has invalid name: {persona_file}")
 
-            key = name.strip().lower()
-            if key in seen:
-                raise RuntimeError(f"Duplicate persona name found: {name}")
-            seen.add(key)
+            description = persona_file.read_text(encoding="utf-8").strip()
+            if not description:
+                raise RuntimeError(f"Persona file is empty: {persona_file}")
 
-        return data
+            personas.append({
+                "name": name,
+                "description": description,
+            })
 
-    def _load_persona_template(self) -> str:
-        if not self.persona_template_path.exists():
-            raise RuntimeError(
-                f"Persona template not found: {self.persona_template_path}"
-            )
-        return self.persona_template_path.read_text(encoding="utf-8")
+        if not personas:
+            raise RuntimeError(f"No persona files found in {self.persona_folder_path}")
+
+        return personas
 
     def save_persona(self, chat_id: int, persona: Dict[str, Any]) -> None:
         self.redis.set(self._persona_key(chat_id), json.dumps(persona))
 
     def list_persona_names(self) -> List[str]:
         """Return a list of available persona names from the catalog."""
-        return [str(p.get("name")) for p in self._personas if p.get("name")]
+        return [str(p["name"]) for p in self._personas]
 
     def set_persona(self, chat_id: int, persona_name: str, user_name: Optional[str] = None) -> bool:
         """Set a specific persona for the chat by name.
@@ -175,10 +164,7 @@ class SessionStore:
 
         persona = {
             "name": source.get("name"),
-            "tone": source.get("tone"),
-            "hobby": source.get("hobby"),
+            "description": source.get("description"),
         }
-        persona["user_hint"] = f" and likes talking to {user_name}" if user_name else ""
-        persona["description"] = self._persona_template.format_map(persona)
 
         return persona

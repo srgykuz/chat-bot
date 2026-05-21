@@ -52,13 +52,15 @@ class LLMClient:
         ]
         messages.extend(history)
 
+        logger.info("Sending chat request to LLM with messages=%s", messages)
+
         return await self._openai_chat(messages)
 
     def _build_system_prompt(self, persona: Dict[str, Any]) -> str:
         template = self._load_system_prompt_template()
         mapping = {
             "current_time": datetime.now(tz=timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"),
-            **persona
+            "persona": persona.get("description", ""),
         }
         try:
             return template.format_map(mapping)

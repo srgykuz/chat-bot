@@ -28,8 +28,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - REDIS_URL=redis://redis:6379
       - SYSTEM_PROMPT_TEMPLATE_PATH=${SYSTEM_PROMPT_TEMPLATE_PATH:-./llm/system.txt}
-      - PERSONA_CATALOG_PATH=${PERSONA_CATALOG_PATH:-./llm/personas.json}
-      - PERSONA_TEMPLATE_PATH=${PERSONA_TEMPLATE_PATH:-./llm/persona.txt}
+      - PERSONA_FOLDER_PATH=${PERSONA_FOLDER_PATH:-./llm/personas}
       - ENVIRONMENT=production
     depends_on:
       redis:
@@ -47,8 +46,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - REDIS_URL=redis://redis:6379
       - SYSTEM_PROMPT_TEMPLATE_PATH=${SYSTEM_PROMPT_TEMPLATE_PATH:-./llm/system.txt}
-      - PERSONA_CATALOG_PATH=${PERSONA_CATALOG_PATH:-./llm/personas.json}
-      - PERSONA_TEMPLATE_PATH=${PERSONA_TEMPLATE_PATH:-./llm/persona.txt}
+      - PERSONA_FOLDER_PATH=${PERSONA_FOLDER_PATH:-./llm/personas}
       - ENVIRONMENT=production
     depends_on:
       redis:
