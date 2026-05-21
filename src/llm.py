@@ -52,8 +52,6 @@ class LLMClient:
         ]
         messages.extend(history)
 
-        logger.info("Sending chat request to LLM with messages=%s", messages)
-
         return await self._openai_chat(messages)
 
     def _build_system_prompt(self, persona: Dict[str, Any], user: Dict[str, Any]) -> str:
