@@ -26,7 +26,7 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     logger.info(f"Processing update {update_id} from {message_info['username']}: {text}")
 
     if text.startswith("/"):
-        response_text = await _handle_command(chat_id, text, message_info["first_name"])
+        response_text = await _handle_command(chat_id, text)
         await telegram_handler.send_message(
             chat_id=chat_id,
             text=response_text,
@@ -40,11 +40,15 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     session_store.append_message(chat_id, "user", text)
 
-    persona = session_store.ensure_persona(chat_id, user_name=message_info.get("first_name"))
+    persona = session_store.ensure_persona(chat_id)
     history = session_store.get_history(chat_id)
+    user = {
+        "name": message_info.get("first_name"),
+        "country": "Россия"
+    }
 
     try:
-        response_text = await llm_client.chat_with_friend(persona, history)
+        response_text = await llm_client.chat_with_friend(persona, history, user)
         session_store.append_message(chat_id, "assistant", response_text)
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc, exc_info=True)
@@ -59,7 +63,7 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return message_info
 
 
-async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> str:
+async def _handle_command(chat_id: int, text: str) -> str:
     command = text.split()[0].lower()
 
     if command == "/get_persona":
@@ -82,7 +86,7 @@ async def _handle_command(chat_id: int, text: str, user_name: Optional[str]) -> 
             return "Usage: /set\\_persona <Name>"
 
         name = parts[1].strip()
-        success = session_store.set_persona(chat_id, name, user_name)
+        success = session_store.set_persona(chat_id, name)
         if success:
             return f"Persona set to {name}."
         return f"Persona {name} not found."

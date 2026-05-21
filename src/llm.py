@@ -40,14 +40,14 @@ class LLMClient:
         elif self.settings.gemini_api_key:
             raise RuntimeError("Gemini support is not implemented yet. Please use OPENAI_API_KEY for now.")
 
-    async def chat_with_friend(self, persona: Dict[str, Any], history: List[Dict[str, str]]) -> str:
+    async def chat_with_friend(self, persona: Dict[str, Any], history: List[Dict[str, str]], user: Dict[str, Any]) -> str:
         if self.provider != "openai":
             raise RuntimeError("No LLM provider configured. Set OPENAI_API_KEY.")
 
         messages = [
             {
                 "role": "system",
-                "content": self._build_system_prompt(persona),
+                "content": self._build_system_prompt(persona, user),
             }
         ]
         messages.extend(history)
@@ -56,17 +56,19 @@ class LLMClient:
 
         return await self._openai_chat(messages)
 
-    def _build_system_prompt(self, persona: Dict[str, Any]) -> str:
+    def _build_system_prompt(self, persona: Dict[str, Any], user: Dict[str, Any]) -> str:
         template = self._load_system_prompt_template()
         mapping = {
             "current_time": datetime.now(tz=timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"),
             "persona": persona.get("description", ""),
+            "user_name": user.get("name", ""),
+            "user_country": user.get("country", ""),
         }
         try:
             return template.format_map(mapping)
         except KeyError as exc:
             raise RuntimeError(
-                f"System prompt template is missing persona field: {exc.args[0]}"
+                f"System prompt template is missing field: {exc.args[0]}"
             ) from exc
 
     def _load_system_prompt_template(self) -> str:
