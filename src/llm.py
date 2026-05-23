@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from google.genai.types import ModelContent, Part, UserContent, GenerateContentConfig
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ class LLMClient:
         self.settings = get_settings()
         self.provider = None
         self.openai = None
+        self.gemini = None
         self.system_prompt_template_path = Path(self.settings.system_prompt_template_path)
         self.llm_params_path = Path(self.settings.llm_params_path)
 
@@ -38,12 +40,17 @@ class LLMClient:
             self.provider = "openai"
 
         elif self.settings.gemini_api_key:
-            raise RuntimeError("Gemini support is not implemented yet. Please use OPENAI_API_KEY for now.")
+            try:
+                from google import genai
+            except ImportError as exc:
+                raise RuntimeError("Gemini SDK is not installed. Add google-genai to requirements.") from exc
+
+            self.gemini = genai.Client(api_key=self.settings.gemini_api_key)
+            self.provider = "gemini"
+
+        logger.info("LLMClient initialized with provider: %s", self.provider)
 
     async def chat_with_friend(self, persona: Dict[str, Any], history: List[Dict[str, str]], user: Dict[str, Any]) -> str:
-        if self.provider != "openai":
-            raise RuntimeError("No LLM provider configured. Set OPENAI_API_KEY.")
-
         messages = [
             {
                 "role": "system",
@@ -52,7 +59,12 @@ class LLMClient:
         ]
         messages.extend(history)
 
-        return await self._openai_chat(messages)
+        if self.provider == "openai":
+            return await self._openai_chat(messages)
+        elif self.provider == "gemini":
+            return await self._gemini_chat(messages)
+        else:
+            raise RuntimeError("Unsupported LLM provider: %s" % self.provider)
 
     def _build_system_prompt(self, persona: Dict[str, Any], user: Dict[str, Any]) -> str:
         template = self._load_system_prompt_template()
@@ -93,6 +105,9 @@ class LLMClient:
 
     async def _openai_chat(self, messages: List[Dict[str, str]]) -> str:
         return await asyncio.to_thread(self._openai_call, messages)
+
+    async def _gemini_chat(self, messages: List[Dict[str, str]]) -> str:
+        return await asyncio.to_thread(self._gemini_call, messages)
 
     def _openai_call(self, messages: List[Dict[str, str]]) -> str:
         if not self.openai:
@@ -136,6 +151,72 @@ class LLMClient:
             getattr(completion, "model", None),
             call_kwargs,
             getattr(completion, "usage", None),
+        )
+
+        return output
+
+    def _gemini_call(self, messages: List[Dict[str, str]]) -> str:
+        if not self.gemini:
+            raise RuntimeError("Gemini client is not initialized.")
+
+        params = self._load_llm_params()
+
+        # build kwargs for the Gemini call, only include known keys
+        allowed_keys = {
+            "temperature",
+            "maxOutputTokens",
+            "topP",
+            "presencePenalty",
+            "frequencyPenalty",
+        }
+        call_kwargs: Dict[str, Any] = {}
+
+        for k in allowed_keys:
+            if k not in params:
+                continue
+
+            if params[k] is None:
+                continue  # skip null values
+
+            if isinstance(params[k], str) and not params[k].strip():
+                continue  # skip empty string values
+
+            call_kwargs[k] = params[k]
+
+        history = []
+        system_prompt = ""
+
+        # convert from openai format to Gemini format
+        for msg in messages:
+            if msg["role"] == "user":
+                history.append(UserContent(parts=[Part(text=msg["content"])]))
+            elif msg["role"] == "assistant":
+                history.append(ModelContent(parts=[Part(text=msg["content"])]))
+            elif msg["role"] == "system":
+                system_prompt = msg["content"]
+            else:
+                raise ValueError("Unknown message role: %s", msg["role"])
+
+        message = messages[-1]["content"] if messages else ""
+        history.pop()
+
+        config = GenerateContentConfig(
+            system_instruction=system_prompt,
+            **call_kwargs,
+        )
+
+        chat = self.gemini.chats.create(
+            model=params.get("model"),
+            history=history,
+            config=config,
+        )
+        response = chat.send_message(message)
+        output = (response.text or "").strip()
+
+        logger.info(
+            "Gemini call model=%s usage=%s",
+            getattr(response, "model_version", None),
+            getattr(response, "usage_metadata", None),
         )
 
         return output
