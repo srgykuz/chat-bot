@@ -1,1 +1,0 @@
-"""Friend Bot package."""
