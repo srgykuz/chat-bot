@@ -1,59 +1,55 @@
-version: '3.8'
-
 services:
   redis:
-    image: redis:7-alpine
-    container_name: friend-bot-redis
-    ports:
-      - "6379:6379"
+    image: redis:8.8-alpine
     volumes:
-      - redis_data:/data
+      - ./redis_data:/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      start_interval: 1s
-      start_period: 5s
+      interval: 30s
       timeout: 5s
-      retries: 5
+      start_period: 30s
+      start_interval: 1s
+      retries: 3
 
-  api:
+  app:
     build: .
-    container_name: friend-bot-api
     ports:
-      - "8000:8000"
-    environment:
-      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - REDIS_URL=redis://redis:6379
-      - SYSTEM_PROMPT_TEMPLATE_PATH=${SYSTEM_PROMPT_TEMPLATE_PATH:-./llm/system.txt}
-      - PERSONA_FOLDER_PATH=${PERSONA_FOLDER_PATH:-./llm/personas}
-      - ENVIRONMENT=production
+      - 8000:8000
+    volumes:
+      - ./llm:/app/llm:ro
+      - ./llm.d:/app/llm.d:ro
+    env_file:
+      - .env
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
     depends_on:
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
 
   worker:
     build: .
-    container_name: friend-bot-worker
-    environment:
-      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - REDIS_URL=redis://redis:6379
-      - SYSTEM_PROMPT_TEMPLATE_PATH=${SYSTEM_PROMPT_TEMPLATE_PATH:-./llm/system.txt}
-      - PERSONA_FOLDER_PATH=${PERSONA_FOLDER_PATH:-./llm/personas}
-      - ENVIRONMENT=production
+    command: python -m src.worker
+    volumes:
+      - ./llm:/app/llm:ro
+      - ./llm.d:/app/llm.d:ro
+    env_file:
+      - .env
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
     depends_on:
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
-    command: python -m src.worker
-
-volumes:
-  redis_data:

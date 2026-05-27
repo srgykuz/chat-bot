@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     persona_folder_path: str = "./llm/personas"
 
     # Redis
-    redis_url: str = "redis://localhost:6379"
+    redis_url: str = "redis://redis:6379"
 
     # History
     max_history_messages: int = 50
