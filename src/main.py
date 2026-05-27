@@ -25,7 +25,6 @@ app.state.poller_task = None
 async def startup_event():
     """Initialize on startup."""
     logger.info("Friend Bot starting up...")
-    logger.info(f"Environment: {settings.environment}")
 
     if settings.telegram_use_polling:
         logger.info("Starting Telegram long polling in development mode")

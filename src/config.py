@@ -1,38 +1,69 @@
-"""Configuration management for the friend bot."""
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """
+    Application settings loaded from .env file and environment variables.
+    """
 
-    # Telegram
-    telegram_token: str = ""
-    telegram_webhook_url: str = ""
-    telegram_use_polling: bool = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False
+    )
 
-    # LLM APIs
-    gemini_api_key: str = ""
-    openai_api_key: str = ""
-    system_prompt_template_path: str = "./llm/system.txt"
-    llm_params_path: str = "./llm/params.json"
-    persona_folder_path: str = "./llm/personas"
+    telegram_token: str = Field(
+        default="",
+        description="Telegram bot token from BotFather.",
+    )
+    telegram_use_polling: bool = Field(
+        default=False,
+        description="Use long polling to receive updates instead of expecting webhook endpoint call.",
+    )
 
-    # Redis
-    redis_url: str = "redis://redis:6379"
+    gemini_api_key: str = Field(
+        default="",
+        description="Google Gemini API key.",
+    )
+    openai_api_key: str = Field(
+        default="",
+        description="OpenAI API key.",
+    )
 
-    # History
-    max_history_messages: int = 50
+    system_prompt_template_path: str = Field(
+        default="./llm/system.txt",
+        description="Path to the system prompt template.",
+    )
+    llm_params_path: str = Field(
+        default="./llm/params.json",
+        description="Path to the LLM parameters JSON.",
+    )
+    persona_folder_path: str = Field(
+        default="./llm/personas",
+        description="Path to the folder that stores persona prompt files.",
+    )
 
-    # Environment
-    environment: str = "development"
+    redis_url: str = Field(
+        default="redis://redis:6379",
+        description="Redis connection URL.",
+    )
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    max_history_messages: int = Field(
+        default=50,
+        description="Maximum number of recent messages to keep in chat history per user.",
+    )
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance."""
+    """Returns parsed and validated settings instance."""
+
     return Settings()
+
+
+if __name__ == "__main__":
+    settings = get_settings()
+
+    print(settings.model_dump_json(indent=4))
