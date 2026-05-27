@@ -1,43 +1,13 @@
-llm.d/
+# Project
+llm.d/*
 
+# Virtual environment
 .venv/
 venv/
-ENV/
-__pycache__/
-*.py[cod]
-*$py.class
-.Python
-pyproject.toml.lock
-pip-log.txt
-pip-delete-this-directory.txt
-htmlcov/
-.tox/
-.cache/
-.coverage
-.coverage.*
-.cache/
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-*.egg
-*.egg-info/
-dist/
-build/
-.eggs/
-*.manifest
-*.spec
-*.log
 
-# Virtual environment directories
-.venv/
-venv/
-ENV/
-
-# IDE/editor directories
+# IDE
 .vscode/
 .idea/
-*.iml
 
 # Environment
 .env
@@ -46,21 +16,22 @@ ENV/
 
 # Docker
 docker-compose.override.yml
-.dockerignore
 
-# Python bytecode
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+pyproject.toml.lock
 
 # Redis
 redis_data/
 
-# RQ
-rq_worker.log
-
 # Logs
 *.log
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
+
+# Git
+!**/.gitkeep
