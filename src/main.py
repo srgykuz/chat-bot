@@ -87,7 +87,7 @@ async def set_webhook_endpoint(webhook_url: str) -> Dict[str, Any]:
         webhook_url: Full URL where Telegram should send updates
     """
     try:
-        from src.telegram_handler import TelegramHandler
+        from src.telegram import TelegramHandler
 
         result = await TelegramHandler().set_webhook(webhook_url)
         logger.info(f"Webhook set to {webhook_url}")
@@ -101,7 +101,7 @@ async def set_webhook_endpoint(webhook_url: str) -> Dict[str, Any]:
 async def webhook_info() -> Dict[str, Any]:
     """Get current webhook information."""
     try:
-        from src.telegram_handler import TelegramHandler
+        from src.telegram import TelegramHandler
 
         info = await TelegramHandler().get_webhook_info()
         return info

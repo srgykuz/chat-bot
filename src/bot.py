@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Any, Optional
 from src.llm import LLMClient
 from src.session import SessionStore
-from src.telegram_handler import TelegramHandler, TelegramUpdateParser
+from src.telegram import TelegramHandler, TelegramUpdateParser
 
 logger = logging.getLogger(__name__)
 

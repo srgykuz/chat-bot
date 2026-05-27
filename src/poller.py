@@ -3,7 +3,7 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any
 from src.config import get_settings
-from src.telegram_handler import TelegramHandler
+from src.telegram import TelegramHandler
 from src.bot import process_update
 
 logger = logging.getLogger(__name__)
