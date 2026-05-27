@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any
 from src.config import get_settings
 from src.bot import process_update
-from src.poller import TelegramPoller
+from src.telegram import TelegramPoller
 
 # Configure logging
 logging.basicConfig(
