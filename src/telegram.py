@@ -213,7 +213,10 @@ class TelegramClient:
         if offset is not None:
             payload["offset"] = offset
 
-        return await self._request_json("POST", "getUpdates", payload=payload, timeout=timeout)
+        # Add buffer to avoid client timeout
+        request_timeout = timeout + 10
+
+        return await self._request_json("POST", "getUpdates", payload=payload, timeout=request_timeout)
 
 
 class TelegramPoller:
