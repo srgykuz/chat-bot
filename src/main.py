@@ -5,7 +5,7 @@ import asyncio
 import logging
 from typing import Dict, Any
 from src.config import get_settings
-from src.bot import process_update
+from src.bot import process_update, telegram_client
 from src.telegram import TelegramPoller
 
 # Configure logging
@@ -19,6 +19,7 @@ app = FastAPI(title="Friend Bot", version="0.1.0")
 
 settings = get_settings()
 app.state.poller_task = None
+app.state.poller = None
 
 
 @app.on_event("startup")
@@ -28,7 +29,8 @@ async def startup_event():
 
     if settings.telegram_use_polling:
         logger.info("Starting Telegram long polling in development mode")
-        app.state.poller_task = asyncio.create_task(TelegramPoller().start())
+        app.state.poller = TelegramPoller(process_update)
+        app.state.poller_task = asyncio.create_task(app.state.poller.start())
 
 
 @app.on_event("shutdown")
@@ -41,6 +43,11 @@ async def shutdown_event():
             await app.state.poller_task
         except asyncio.CancelledError:
             pass
+
+    if app.state.poller is not None:
+        await app.state.poller.aclose()
+
+    await telegram_client.aclose()
 
 
 @app.get("/health")
@@ -87,9 +94,10 @@ async def set_webhook_endpoint(webhook_url: str) -> Dict[str, Any]:
         webhook_url: Full URL where Telegram should send updates
     """
     try:
-        from src.telegram import TelegramHandler
+        from src.telegram import TelegramClient
 
-        result = await TelegramHandler().set_webhook(webhook_url)
+        async with TelegramClient() as handler:
+            result = await handler.set_webhook(webhook_url)
         logger.info(f"Webhook set to {webhook_url}")
         return result
     except Exception as e:
@@ -101,9 +109,10 @@ async def set_webhook_endpoint(webhook_url: str) -> Dict[str, Any]:
 async def webhook_info() -> Dict[str, Any]:
     """Get current webhook information."""
     try:
-        from src.telegram import TelegramHandler
+        from src.telegram import TelegramClient
 
-        info = await TelegramHandler().get_webhook_info()
+        async with TelegramClient() as handler:
+            info = await handler.get_webhook_info()
         return info
     except Exception as e:
         logger.error(f"Error getting webhook info: {e}")

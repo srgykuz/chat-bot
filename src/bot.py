@@ -3,47 +3,54 @@ import logging
 from typing import Dict, Any, Optional
 from src.llm import LLMClient
 from src.session import SessionStore
-from src.telegram import TelegramHandler, TelegramUpdateParser
+from src.telegram import TelegramClient, TelegramMessage, parse_update
 
 logger = logging.getLogger(__name__)
 
-telegram_handler = TelegramHandler()
-update_parser = TelegramUpdateParser()
+telegram_client = TelegramClient()
 session_store = SessionStore()
 llm_client = LLMClient()
 
 
-async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def process_update(update: Dict[str, Any]) -> Optional[TelegramMessage]:
     """Process a Telegram update and respond to the user."""
-    message_info = update_parser.parse_update(update)
+    message_info = parse_update(update)
     if not message_info:
         logger.debug("Update did not contain text message, skipping")
         return None
 
-    chat_id = message_info["chat_id"]
-    update_id = message_info.get("update_id")
-    text = message_info["text"].strip()
-    logger.info(f"Processing update {update_id} from {message_info['username']}: {text}")
+    chat_id = message_info.chat_id
+    if chat_id is None:
+        logger.debug("Update did not contain a chat id, skipping")
+        return None
+
+    if message_info.text is None:
+        logger.debug("Update did not contain text, skipping")
+        return None
+
+    update_id = message_info.update_id
+    text = message_info.text.strip()
+    logger.info(f"Processing update {update_id} from {message_info.username}: {text}")
 
     if text.startswith("/"):
         response_text = await _handle_command(chat_id, text)
-        await telegram_handler.send_message(
+        await telegram_client.send_message(
             chat_id=chat_id,
             text=response_text,
-            reply_to_message_id=message_info["message_id"],
+            reply_to_message_id=message_info.message_id,
             escape=False
         )
-        logger.info(f"Processed command for update {update_id} from {message_info['username']}")
+        logger.info(f"Processed command for update {update_id} from {message_info.username}")
         return message_info
 
-    await telegram_handler.send_chat_action(chat_id, action="typing")
+    await telegram_client.send_chat_action(chat_id, action="typing")
 
     session_store.append_message(chat_id, "user", text)
 
     persona = session_store.ensure_persona(chat_id)
     history = session_store.get_history(chat_id)
     user = {
-        "name": message_info.get("first_name"),
+        "name": message_info.first_name,
         "country": "Россия"
     }
 
@@ -54,12 +61,12 @@ async def process_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         logger.error("LLM generation failed: %s", exc, exc_info=True)
         response_text = "Sorry, I couldn't think of a good answer right now. Let's keep talking!"
 
-    await telegram_handler.send_message(
+    await telegram_client.send_message(
         chat_id=chat_id,
         text=response_text
     )
 
-    logger.info(f"Sent response for update {update_id} to {message_info['username']}")
+    logger.info(f"Sent response for update {update_id} to {message_info.username}")
     return message_info
 
 
