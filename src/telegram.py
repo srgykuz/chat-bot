@@ -125,9 +125,19 @@ class TelegramClient:
         try:
             response = await self.client.request(http_method, url, **request_kwargs)
             response.raise_for_status()
+
             return response.json()
         except httpx.HTTPError as error:
-            self._log_http_error(error, {"method": http_method, "url": url, "payload": payload})
+            # Suppress logging of sensitive Telegram Bot URL
+            error.args = ("HTTP error",)
+
+            request = {
+                "http_method": http_method,
+                "api_method": api_method,
+                "payload": payload,
+            }
+            self._log_http_error(error, request)
+
             raise
 
     async def send_message(
