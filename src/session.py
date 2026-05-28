@@ -1,170 +1,244 @@
-"""Session storage and persona management for Friend Bot."""
 import json
 import random
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Dict, List, Optional, cast
+from enum import StrEnum
+
 from redis import Redis
+
 from src.config import get_settings
 
 
-RedisValue = Union[str, bytes]
+class MessageRole(StrEnum):
+    """
+    Who created a message.
+    """
+    USER = "user"
+    ASSISTANT = "assistant"
 
 
-class SessionStore:
-    """Manage per-user conversation history and persona storage."""
+@dataclass(frozen=True, slots=True)
+class Message:
+    """
+    A message in the conversation history.
+    """
+    role: MessageRole
+    content: str
 
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class Persona:
+    """
+    A persona prompt.
+    """
+    name: str
+    prompt: str
+
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryInfo:
+    """
+    Meta information about the conversation history.
+    """
+    max_messages: int
+    num_messages: int
+    num_user_messages: int
+    num_assistant_messages: int
+
+    def to_dict(self) -> Dict[str, int]:
+        return asdict(self)
+
+
+class Session:
+    """
+    Manages per-user and per-chat state: history, persona, etc.
+    A data in the state must not be considered as permanent as it
+    may be lost at any time. The state is stored in Redis.
+    """
     def __init__(self) -> None:
-        settings = get_settings()
-        self.redis = Redis.from_url(settings.redis_url, decode_responses=True)
-        self.max_history_messages = settings.max_history_messages
+        self.settings = get_settings()
+        self.redis = Redis.from_url(self.settings.redis_url, decode_responses=True)
+        self.personas = self.load_personas(Path(self.settings.persona_folder_path))
 
-        self.persona_folder_path = Path(settings.persona_folder_path)
+        if not self.personas:
+            raise RuntimeError(f"No personas found in the catalog: {self.settings.persona_folder_path}")
 
-        if not self.persona_folder_path.is_absolute():
-            self.persona_folder_path = (
-                Path(__file__).resolve().parents[1] / self.persona_folder_path
-            )
+    def close(self) -> None:
+        """
+        Closes the underlying resources.
+        """
+        self.redis.close()
 
-        self._personas = self._load_personas()
+    def clear(self, chat_id: int) -> None:
+        """
+        Removes entire state for the given chat ID.
+        """
+        pipe = self.redis.pipeline()
+
+        pipe.delete(self._history_key(chat_id))
+        pipe.delete(self._persona_key(chat_id))
+
+        pipe.execute()
 
     def _persona_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing the persona of a specific chat.
+        """
         return f"session:{chat_id}:persona"
 
     def _history_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing the conversation history of a specific chat.
+        """
         return f"session:{chat_id}:history"
 
-    def get_persona(self, chat_id: int) -> Optional[Dict[str, Any]]:
-        raw = cast(Optional[RedisValue], self.redis.get(self._persona_key(chat_id)))
-        if raw is None:
-            return None
+    def load_personas(self, dir: Path) -> List[Persona]:
+        """
+        Loads persona prompts from the specified directory.
+        Empty personas are ignored.
 
-        if isinstance(raw, bytes):
-            raw = raw.decode()
+        Each persona should be defined in a separate .txt file, where the filename
+        (without extension) is the persona name, and the file content is the persona prompt.
+        """
+        if not dir.exists() or not dir.is_dir():
+            raise RuntimeError(f"Persona directory not found: {dir}")
 
-        return json.loads(raw)
+        personas: List[Persona] = []
 
-    def _load_personas(self) -> List[Dict[str, Any]]:
-        if not self.persona_folder_path.exists() or not self.persona_folder_path.is_dir():
-            raise RuntimeError(
-                f"Persona folder not found: {self.persona_folder_path}"
-            )
-
-        personas: List[Dict[str, Any]] = []
-
-        for persona_file in sorted(self.persona_folder_path.glob("*.txt")):
-            if not persona_file.is_file():
+        for file in sorted(dir.glob("*.txt")):
+            if not file.is_file():
                 continue
 
-            name = persona_file.stem.strip()
+            name = file.stem.strip()
+
             if not name:
-                raise RuntimeError(f"Persona file has invalid name: {persona_file}")
+                raise RuntimeError(f"Persona file has invalid name: {file}")
 
-            description = persona_file.read_text(encoding="utf-8").strip()
-            if not description:
-                raise RuntimeError(f"Persona file is empty: {persona_file}")
+            prompt = file.read_text(encoding="utf-8").strip()
 
-            personas.append({
-                "name": name,
-                "description": description,
-            })
+            if not prompt:
+                continue
 
-        if not personas:
-            raise RuntimeError(f"No persona files found in {self.persona_folder_path}")
+            personas.append(Persona(name=name, prompt=prompt))
 
         return personas
 
-    def save_persona(self, chat_id: int, persona: Dict[str, Any]) -> None:
-        self.redis.set(self._persona_key(chat_id), json.dumps(persona))
-
-    def list_persona_names(self) -> List[str]:
-        """Return a list of available persona names from the catalog."""
-        return [str(p["name"]) for p in self._personas]
-
-    def set_persona(self, chat_id: int, persona_name: str) -> bool:
-        """Set a specific persona for the chat by name.
-
-        Returns True if the persona was found and saved, False otherwise.
+    def get_persona(self, chat_id: int) -> Optional[Persona]:
         """
-        try:
-            persona = self._create_persona(persona_name=persona_name)
-        except ValueError:
-            return False
+        Returns the currently set persona for the given chat ID, or None if no persona is set.
+        """
+        key = self._persona_key(chat_id)
+        raw = cast(Optional[str], self.redis.get(key))
 
-        self.save_persona(chat_id, persona)
-        return True
+        if raw is None:
+            return None
 
-    def ensure_persona(self, chat_id: int) -> Dict[str, Any]:
-        persona = self.get_persona(chat_id)
-        if persona is not None:
-            return persona
+        data = json.loads(raw)
+        persona = Persona(**data)
 
-        persona = self._create_persona()
-        self.save_persona(chat_id, persona)
         return persona
 
-    def append_message(self, chat_id: int, role: str, content: str) -> None:
-        message = {"role": role, "content": content}
-        self.redis.rpush(self._history_key(chat_id), json.dumps(message))
-        self.redis.ltrim(self._history_key(chat_id), -self.max_history_messages, -1)
+    def set_persona(self, chat_id: int, persona: Persona) -> None:
+        """
+        Sets the given persona for the specified chat ID.
+        """
+        key = self._persona_key(chat_id)
+        value = json.dumps(persona.to_dict())
 
-    def get_history(self, chat_id: int) -> List[Dict[str, Any]]:
-        raw_items = cast(List[RedisValue], self.redis.lrange(self._history_key(chat_id), -self.max_history_messages, -1))
-        history: List[Dict[str, Any]] = []
+        self.redis.set(key, value)
 
-        for item in raw_items:
+    def select_persona(self, persona_name: Optional[str] = None) -> Persona:
+        """
+        Selects a persona from the catalog.
+
+        If persona_name is provided, tries to find a persona with that name (case-insensitive).
+        If no persona is found, raises an exception. If persona_name is not provided, then
+        selects a random persona from the catalog.
+        """
+        persona_name = persona_name.strip() if persona_name else None
+
+        if not persona_name:
+            return random.choice(self.personas)
+
+        persona: Optional[Persona] = None
+
+        for p in self.personas:
+            if p.name.casefold() == persona_name.casefold():
+                persona = p
+                break
+
+        if not persona:
+            raise ValueError(f"Persona not found: {persona_name}")
+
+        return persona
+
+    def init_persona(self, chat_id: int) -> Persona:
+        """
+        Ensures that a persona is set for the given chat ID.
+        If no persona is set, a new one will be created and set.
+
+        Returns the currently set or newly created persona.
+        """
+        existing_persona = self.get_persona(chat_id)
+
+        if existing_persona is not None:
+            return existing_persona
+
+        new_persona = self.select_persona()
+        self.set_persona(chat_id, new_persona)
+
+        return new_persona
+
+    def get_history(self, chat_id: int) -> List[Message]:
+        """
+        Returns the conversation history for the given chat ID.
+        Ordered from oldest to newest message.
+        """
+        key = self._history_key(chat_id)
+        items = cast(List[str], self.redis.lrange(key, -self.settings.max_history_messages, -1))
+        history: List[Message] = []
+
+        for item in items:
             if not item:
                 continue
-            if isinstance(item, bytes):
-                item = item.decode()
-            history.append(json.loads(item))
+
+            data = json.loads(item)
+            history.append(Message(**data))
 
         return history
 
-    def clear_history(self, chat_id: int) -> None:
-        self.redis.delete(self._history_key(chat_id))
-
-    def clear_persona(self, chat_id: int) -> None:
-        self.redis.delete(self._persona_key(chat_id))
-
-    def get_history_info(self, chat_id: int) -> Dict[str, int]:
-        history = self.get_history(chat_id)
-        num_user = sum(1 for message in history if message.get("role") == "user")
-        num_assistant = sum(1 for message in history if message.get("role") == "assistant")
-
-        return {
-            "num_messages": len(history),
-            "max_history_messages": self.max_history_messages,
-            "num_user_messages": num_user,
-            "num_assistant_messages": num_assistant,
-        }
-
-    def clear(self, chat_id: int) -> None:
-        self.clear_persona(chat_id)
-        self.clear_history(chat_id)
-
-    def _create_persona(self, persona_name: Optional[str] = None) -> Dict[str, Any]:
-        """Create a persona dictionary.
-
-        If `persona_name` is provided, attempt to use that persona from the catalog;
-        otherwise choose a random persona.
+    def append_history(self, chat_id: int, message: Message) -> None:
         """
-        source: Dict[str, Any]
-        if persona_name:
-            match = None
-            for p in self._personas:
-                if str(p.get("name", "")).lower() == persona_name.strip().lower():
-                    match = p
-                    break
-            if match is None:
-                # Explicitly error if requested persona name not found
-                raise ValueError(f"Persona not found: {persona_name}")
-            source = match
-        else:
-            source = random.choice(self._personas)
+        Appends a message to the conversation history for the given chat ID.
+        The conversation history is trimmed to the maximum length defined in the settings.
+        """
+        key = self._history_key(chat_id)
+        value = json.dumps(message.to_dict())
+        pipe = self.redis.pipeline()
 
-        persona = {
-            "name": source.get("name"),
-            "description": source.get("description"),
-        }
+        pipe.rpush(key, value)
+        pipe.ltrim(key, -self.settings.max_history_messages, -1)
 
-        return persona
+        pipe.execute()
+
+    def get_history_info(self, chat_id: int) -> HistoryInfo:
+        """
+        Returns meta information about the conversation history for the given chat ID.
+        """
+        history = self.get_history(chat_id)
+        num_user = sum(1 for msg in history if msg.role == MessageRole.USER)
+        num_assistant = sum(1 for msg in history if msg.role == MessageRole.ASSISTANT)
+
+        return HistoryInfo(
+            max_messages=self.settings.max_history_messages,
+            num_messages=len(history),
+            num_user_messages=num_user,
+            num_assistant_messages=num_assistant,
+        )

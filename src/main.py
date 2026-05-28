@@ -5,7 +5,7 @@ import asyncio
 import logging
 from typing import Dict, Any
 from src.config import get_settings
-from src.bot import process_update, telegram_client
+from src.bot import process_update, telegram_client, session_store
 from src.telegram import TelegramPoller
 
 # Configure logging
@@ -49,6 +49,7 @@ async def shutdown_event():
         await app.state.poller.aclose()
 
     await telegram_client.aclose()
+    session_store.close()
 
 
 @app.get("/health")

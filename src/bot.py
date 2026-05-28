@@ -2,13 +2,13 @@
 import logging
 from typing import Dict, Any, Optional
 from src.llm import LLMClient
-from src.session import SessionStore
+from src.session import Message, MessageRole, Session, Persona
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 
 logger = logging.getLogger(__name__)
 
 telegram_client = TelegramClient()
-session_store = SessionStore()
+session_store = Session()
 llm_client = LLMClient()
 
 
@@ -45,9 +45,9 @@ async def process_update(update: Dict[str, Any]) -> Optional[TelegramMessage]:
 
     await telegram_client.send_chat_action(chat_id, action="typing")
 
-    session_store.append_message(chat_id, "user", text)
+    session_store.append_history(chat_id, Message(role=MessageRole.USER, content=text))
 
-    persona = session_store.ensure_persona(chat_id)
+    persona = session_store.init_persona(chat_id)
     history = session_store.get_history(chat_id)
     user = {
         "name": message_info.first_name,
@@ -56,7 +56,7 @@ async def process_update(update: Dict[str, Any]) -> Optional[TelegramMessage]:
 
     try:
         response_text = await llm_client.chat_with_friend(persona, history, user)
-        session_store.append_message(chat_id, "assistant", response_text)
+        session_store.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=response_text))
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc, exc_info=True)
         response_text = "Sorry, I couldn't think of a good answer right now. Let's keep talking!"
@@ -80,11 +80,11 @@ async def _handle_command(chat_id: int, text: str) -> str:
 
         return (
             "*Current persona:*\n"
-            f"Name: `{persona.get('name')}`\n"
+            f"Name: `{persona.name}`\n"
         )
 
     if command == "/clear_persona":
-        session_store.clear_persona(chat_id)
+        session_store.clear(chat_id)
         return "Persona cleared. A new persona will be created on the next message."
 
     if command == "/set_persona":
@@ -93,13 +93,21 @@ async def _handle_command(chat_id: int, text: str) -> str:
             return "Usage: /set\\_persona <Name>"
 
         name = parts[1].strip()
-        success = session_store.set_persona(chat_id, name)
-        if success:
-            return f"Persona set to {name}."
-        return f"Persona {name} not found."
+        persona: Optional[Persona] = None
+
+        try:
+            persona = session_store.select_persona(name)
+        except Exception:
+            persona = None
+
+        if persona:
+            session_store.set_persona(chat_id, persona)
+            return f"Persona set to {persona.name}."
+        else:
+            return f"Persona {name} not found."
 
     if command == "/list_persona":
-        names = session_store.list_persona_names()
+        names = [p.name for p in session_store.personas]
         if not names:
             return "No personas available."
         names = [f"`{n}`" for n in names]
@@ -109,14 +117,14 @@ async def _handle_command(chat_id: int, text: str) -> str:
         info = session_store.get_history_info(chat_id)
         return (
             "*Chat history info:*\n"
-            f"Total messages: `{info['num_messages']}`\n"
-            f"Max history stored: `{info['max_history_messages']}`\n"
-            f"User messages: `{info['num_user_messages']}`\n"
-            f"Assistant messages: `{info['num_assistant_messages']}`"
+            f"Total messages: `{info.num_messages}`\n"
+            f"Max history stored: `{info.max_messages}`\n"
+            f"User messages: `{info.num_user_messages}`\n"
+            f"Assistant messages: `{info.num_assistant_messages}`"
         )
 
     if command == "/clear_history":
-        session_store.clear_history(chat_id)
+        session_store.clear(chat_id)
         return "Chat history cleared."
 
     if command == "/clear":

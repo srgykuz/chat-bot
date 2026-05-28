@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from google.genai.types import ModelContent, Part, UserContent, GenerateContentConfig
 from src.config import get_settings
+from src.session import Message, Persona
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +51,14 @@ class LLMClient:
 
         logger.info("LLMClient initialized with provider: %s", self.provider)
 
-    async def chat_with_friend(self, persona: Dict[str, Any], history: List[Dict[str, str]], user: Dict[str, Any]) -> str:
+    async def chat_with_friend(self, persona: Persona, history: List[Message], user: Dict[str, Any]) -> str:
         messages = [
             {
                 "role": "system",
                 "content": self._build_system_prompt(persona, user),
             }
         ]
-        messages.extend(history)
+        messages.extend([msg.to_dict() for msg in history])
 
         if self.provider == "openai":
             return await self._openai_chat(messages)
@@ -66,11 +67,11 @@ class LLMClient:
         else:
             raise RuntimeError("Unsupported LLM provider: %s" % self.provider)
 
-    def _build_system_prompt(self, persona: Dict[str, Any], user: Dict[str, Any]) -> str:
+    def _build_system_prompt(self, persona: Persona, user: Dict[str, Any]) -> str:
         template = self._load_system_prompt_template()
         mapping = {
             "current_time": datetime.now(tz=timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"),
-            "persona": persona.get("description", ""),
+            "persona": persona.prompt,
             "user_name": user.get("name", ""),
             "user_country": user.get("country", ""),
         }
