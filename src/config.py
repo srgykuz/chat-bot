@@ -32,17 +32,17 @@ class Settings(BaseSettings):
         description="OpenAI API key.",
     )
 
-    system_prompt_template_path: str = Field(
+    system_prompt_path: str = Field(
         default="./llm/system.txt",
-        description="Path to the system prompt template.",
+        description="Path to the system prompt text file.",
     )
-    llm_params_path: str = Field(
+    model_params_path: str = Field(
         default="./llm/params.json",
-        description="Path to the LLM parameters JSON.",
+        description="Path to the LLM model parameters JSON file.",
     )
-    persona_folder_path: str = Field(
+    persona_dir_path: str = Field(
         default="./llm/personas",
-        description="Path to the folder that stores persona prompt files.",
+        description="Path to the directory that stores persona prompt files.",
     )
 
     redis_url: str = Field(

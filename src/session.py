@@ -16,6 +16,7 @@ class MessageRole(StrEnum):
     """
     USER = "user"
     ASSISTANT = "assistant"
+    SYSTEM = "system"
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,13 +34,31 @@ class Message:
 @dataclass(frozen=True, slots=True)
 class Persona:
     """
-    A persona prompt.
+    Information about a persona that we are mimicking in the conversation.
     """
     name: str
     prompt: str
 
     def to_dict(self) -> Dict[str, str]:
         return asdict(self)
+
+    def tz_offset(self) -> int:
+        return 3
+
+
+@dataclass(frozen=True, slots=True)
+class User:
+    """
+    Information about a user that we are talking to.
+    """
+    first_name: Optional[str]
+    last_name: Optional[str]
+
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+    def country(self) -> Optional[str]:
+        return "Россия"
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,10 +84,10 @@ class Session:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.redis = Redis.from_url(self.settings.redis_url, decode_responses=True)
-        self.personas = self.load_personas(Path(self.settings.persona_folder_path))
+        self.personas = self.load_personas(Path(self.settings.persona_dir_path))
 
         if not self.personas:
-            raise RuntimeError(f"No personas found in the catalog: {self.settings.persona_folder_path}")
+            raise RuntimeError(f"No personas found in the catalog: {self.settings.persona_dir_path}")
 
     def close(self) -> None:
         """

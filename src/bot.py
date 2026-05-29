@@ -1,15 +1,15 @@
 """Shared bot logic for processing Telegram updates."""
 import logging
 from typing import Dict, Any, Optional
-from src.llm import LLMClient
-from src.session import Message, MessageRole, Session, Persona
+from src.llm import ModelClient
+from src.session import Message, MessageRole, Session, Persona, User
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 
 logger = logging.getLogger(__name__)
 
 telegram_client = TelegramClient()
 session_store = Session()
-llm_client = LLMClient()
+model_client = ModelClient()
 
 
 async def process_update(update: Dict[str, Any]) -> Optional[TelegramMessage]:
@@ -49,13 +49,14 @@ async def process_update(update: Dict[str, Any]) -> Optional[TelegramMessage]:
 
     persona = session_store.init_persona(chat_id)
     history = session_store.get_history(chat_id)
-    user = {
-        "name": message_info.first_name,
-        "country": "Россия"
-    }
+    user = User(
+        first_name=message_info.first_name,
+        last_name=message_info.last_name,
+    )
 
     try:
-        response_text = await llm_client.chat_with_friend(persona, history, user)
+        system_prompt = model_client.build_system_prompt(persona, user)
+        response_text = await model_client.chat(system_prompt, history)
         session_store.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=response_text))
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc, exc_info=True)

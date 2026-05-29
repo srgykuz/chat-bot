@@ -1,222 +1,214 @@
-"""LLM integration for generating friend-like responses."""
-import asyncio
-import logging
 import json
-from datetime import datetime, timezone, timedelta
+import logging
+import asyncio
+from abc import ABC, abstractmethod
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from google.genai.types import ModelContent, Part, UserContent, GenerateContentConfig
+from typing import Any, Dict, List
+
+import openai
+from google import genai
+from google.genai.types import GenerateContentConfig, ModelContent, Part, UserContent
+
 from src.config import get_settings
-from src.session import Message, Persona
+from src.session import Message, MessageRole, Persona, User
+
 
 logger = logging.getLogger(__name__)
 
 
-class LLMClient:
-    """Wrapper for LLM provider calls."""
+class ProviderClient(ABC):
+    """
+    Base class that should be implemented by provider-specific LLM client.
+    """
+    name = ""
 
+    def __init__(self, parent: "ModelClient") -> None:
+        self.parent = parent
+
+    @abstractmethod
+    def chat(self, context: List[Message]) -> str:
+        """
+        Generates a response for the supplied chat context.
+        The context consist of system prompt, past user and assistant messages,
+        and user's current message the model should respond to.
+        Output is a generated assistant message text.
+        """
+
+
+class ModelClient:
+    """
+    Wrapper for interaction with LLM API of any provider.
+    The provider is selected based on the settings (e.g. OpenAI, Gemini).
+    """
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.provider = None
-        self.openai = None
-        self.gemini = None
-        self.system_prompt_template_path = Path(self.settings.system_prompt_template_path)
-        self.llm_params_path = Path(self.settings.llm_params_path)
+        self.provider: ProviderClient = self.create_provider()
 
-        if not self.system_prompt_template_path.is_absolute():
-            self.system_prompt_template_path = (
-                Path(__file__).resolve().parents[1] / self.system_prompt_template_path
-            )
-
-        if not self.llm_params_path.is_absolute():
-            self.llm_params_path = Path(__file__).resolve().parents[1] / self.llm_params_path
-
+    def create_provider(self) -> ProviderClient:
+        """
+        Creates and returns an instance of the provider client.
+        Using this instance you can interact with specific LLM API.
+        The provider is selected based on the settings.
+        If no supported provider is configured, raises RuntimeError.
+        """
         if self.settings.openai_api_key:
-            try:
-                import openai
-            except ImportError as exc:
-                raise RuntimeError("OpenAI SDK is not installed. Add openai to requirements.") from exc
+            return OpenAIClient(self)
 
-            self.openai = openai.OpenAI(api_key=self.settings.openai_api_key)
-            self.provider = "openai"
+        if self.settings.gemini_api_key:
+            return GeminiClient(self)
 
-        elif self.settings.gemini_api_key:
-            try:
-                from google import genai
-            except ImportError as exc:
-                raise RuntimeError("Gemini SDK is not installed. Add google-genai to requirements.") from exc
+        raise RuntimeError("No supported LLM provider is configured.")
 
-            self.gemini = genai.Client(api_key=self.settings.gemini_api_key)
-            self.provider = "gemini"
+    async def chat(self, system_prompt: str, conversation: List[Message]) -> str:
+        """
+        Builds full chat context, calls LLM API and returns generated response.
 
-        logger.info("LLMClient initialized with provider: %s", self.provider)
+        system_prompt should be created using build_system_prompt(). Create it
+        for every new chat() call.
 
-    async def chat_with_friend(self, persona: Persona, history: List[Message], user: Dict[str, Any]) -> str:
-        messages = [
-            {
-                "role": "system",
-                "content": self._build_system_prompt(persona, user),
-            }
-        ]
-        messages.extend([msg.to_dict() for msg in history])
+        conversation should contain all previous messages from both user and assistant,
+        and should contain user's current message the model should respond to. Sorted from
+        oldest to newest.
+        """
+        if not conversation:
+            raise RuntimeError("Conversation must contain at least one message.")
 
-        if self.provider == "openai":
-            return await self._openai_chat(messages)
-        elif self.provider == "gemini":
-            return await self._gemini_chat(messages)
-        else:
-            raise RuntimeError("Unsupported LLM provider: %s" % self.provider)
+        if conversation[-1].role != MessageRole.USER:
+            raise RuntimeError("The last message in the conversation must be from user.")
 
-    def _build_system_prompt(self, persona: Persona, user: Dict[str, Any]) -> str:
-        template = self._load_system_prompt_template()
+        context = [
+            Message(role=MessageRole.SYSTEM, content=system_prompt)
+        ] + conversation
+
+        output = await asyncio.to_thread(self.provider.chat, context)
+        output = output.strip()
+
+        return output
+
+    def build_system_prompt(self, persona: Persona, user: User) -> str:
+        """
+        Creates a system prompt by loading the template and filling all the
+        required placeholders. You should pass returned string as system prompt
+        to the chat() method.
+        """
+        template = self.load_system_prompt()
+
+        persona_tz = timezone(timedelta(hours=persona.tz_offset()))
+        persona_time = datetime.now(tz=persona_tz).strftime("%Y-%m-%d %H:%M:%S")
+
         mapping = {
-            "current_time": datetime.now(tz=timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"),
-            "persona": persona.prompt,
-            "user_name": user.get("name", ""),
-            "user_country": user.get("country", ""),
+            "persona_time": persona_time,
+            "persona_prompt": persona.prompt,
+            "user_name": user.first_name or "",
+            "user_country": user.country() or "",
         }
-        try:
-            return template.format_map(mapping)
-        except KeyError as exc:
-            raise RuntimeError(
-                f"System prompt template is missing field: {exc.args[0]}"
-            ) from exc
 
-    def _load_system_prompt_template(self) -> str:
-        if not self.system_prompt_template_path.exists():
-            raise RuntimeError(
-                f"System prompt template not found: {self.system_prompt_template_path}"
-            )
-        return self.system_prompt_template_path.read_text(encoding="utf-8")
+        return template.format_map(mapping)
 
-    def _load_llm_params(self) -> Dict[str, Any]:
-        try:
-            if not self.llm_params_path.exists():
-                raise RuntimeError(f"LLM params file not found: {self.llm_params_path}")
+    def load_system_prompt(self) -> str:
+        """
+        Loads the system prompt from the configured text file path.
+        """
+        path = Path(self.settings.system_prompt_path)
 
-            raw = self.llm_params_path.read_text(encoding="utf-8")
-            data = json.loads(raw)
+        if not path.exists():
+            raise RuntimeError(f"System prompt file not found: {path}")
 
-            if not isinstance(data, dict):
-                raise RuntimeError("LLM params file must contain a JSON object at the top level.")
+        return path.read_text(encoding="utf-8")
 
-            return data
-        except Exception:
-            raise RuntimeError(f"Error occurred while loading LLM params from {self.llm_params_path}")
+    def load_model_params(self) -> Dict[str, Any]:
+        """
+        Loads the model parameters from the configured JSON file path.
+        """
+        path = Path(self.settings.model_params_path)
 
-    async def _openai_chat(self, messages: List[Dict[str, str]]) -> str:
-        return await asyncio.to_thread(self._openai_call, messages)
+        if not path.exists():
+            raise RuntimeError(f"Model params file not found: {path}")
 
-    async def _gemini_chat(self, messages: List[Dict[str, str]]) -> str:
-        return await asyncio.to_thread(self._gemini_call, messages)
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
 
-    def _openai_call(self, messages: List[Dict[str, str]]) -> str:
-        if not self.openai:
-            raise RuntimeError("OpenAI client is not initialized.")
+        if not isinstance(data, dict):
+            raise RuntimeError("Model params file must contain a JSON object at the top level.")
 
-        params = self._load_llm_params()
+        return data
 
-        # build kwargs for the OpenAI call, only include known keys
-        allowed_keys = {
-            "model",
-            "temperature",
-            "max_completion_tokens",
-            "top_p",
-            "presence_penalty",
-            "frequency_penalty",
-            "reasoning_effort",
-            "verbosity",
-        }
-        call_kwargs: Dict[str, Any] = {}
 
-        for k in allowed_keys:
-            if k not in params:
-                continue
+class OpenAIClient(ProviderClient):
+    name = "openai"
 
-            if params[k] is None:
-                continue  # skip null values
+    def __init__(self, parent: "ModelClient") -> None:
+        super().__init__(parent)
+        self.client = openai.OpenAI(api_key=self.parent.settings.openai_api_key)
 
-            if isinstance(params[k], str) and not params[k].strip():
-                continue  # skip empty string values
+    def chat(self, context: List[Message]) -> str:
+        params = self.parent.load_model_params()
 
-            call_kwargs[k] = params[k]
+        messages = [msg.to_dict() for msg in context]
+        params["messages"] = messages
 
-        # messages handled separately
-        call_kwargs["messages"] = messages
-        completion = self.openai.chat.completions.create(**call_kwargs)
-        output = (completion.choices[0].message.content or "").strip()
+        completion = self.client.chat.completions.create(**params)
 
-        call_kwargs.pop("messages", None)  # remove messages from kwargs for cleaner logging
+        if not completion.choices:
+            raise RuntimeError("No response.")
+
+        output = completion.choices[0].message.content or ""
+
+        params_log = dict(params)
+        params_log.pop("messages", None)
         logger.info(
-            "OpenAI call model=%s args=%s usage=%s",
+            "OpenAI call model=%s params=%s usage=%s",
             getattr(completion, "model", None),
-            call_kwargs,
+            params_log,
             getattr(completion, "usage", None),
         )
 
         return output
 
-    def _gemini_call(self, messages: List[Dict[str, str]]) -> str:
-        if not self.gemini:
-            raise RuntimeError("Gemini client is not initialized.")
 
-        params = self._load_llm_params()
+class GeminiClient(ProviderClient):
+    name = "gemini"
 
-        # build kwargs for the Gemini call, only include known keys
-        allowed_keys = {
-            "temperature",
-            "maxOutputTokens",
-            "topP",
-            "presencePenalty",
-            "frequencyPenalty",
-        }
-        call_kwargs: Dict[str, Any] = {}
+    def __init__(self, parent: "ModelClient") -> None:
+        super().__init__(parent)
+        self.client = genai.Client(api_key=self.parent.settings.gemini_api_key)
 
-        for k in allowed_keys:
-            if k not in params:
-                continue
-
-            if params[k] is None:
-                continue  # skip null values
-
-            if isinstance(params[k], str) and not params[k].strip():
-                continue  # skip empty string values
-
-            call_kwargs[k] = params[k]
-
-        history = []
+    def chat(self, context: List[Message]) -> str:
         system_prompt = ""
+        curr_message = context[-1].content
+        history = []
 
-        # convert from openai format to Gemini format
-        for msg in messages:
-            if msg["role"] == "user":
-                history.append(UserContent(parts=[Part(text=msg["content"])]))
-            elif msg["role"] == "assistant":
-                history.append(ModelContent(parts=[Part(text=msg["content"])]))
-            elif msg["role"] == "system":
-                system_prompt = msg["content"]
+        for msg in context[:-1]:
+            if msg.role == MessageRole.SYSTEM:
+                system_prompt = msg.content
+            elif msg.role == MessageRole.USER:
+                history.append(UserContent(parts=[Part(text=msg.content)]))
+            elif msg.role == MessageRole.ASSISTANT:
+                history.append(ModelContent(parts=[Part(text=msg.content)]))
             else:
-                raise ValueError("Unknown message role: %s", msg["role"])
+                raise ValueError(f"Unknown message role: {msg.role}")
 
-        message = messages[-1]["content"] if messages else ""
-        history.pop()
+        params = self.parent.load_model_params()
+        model = params.pop("model", "")
 
         config = GenerateContentConfig(
             system_instruction=system_prompt,
-            **call_kwargs,
+            **params,
         )
-
-        chat = self.gemini.chats.create(
-            model=params.get("model"),
+        chat = self.client.chats.create(
+            model=model,
             history=history,
             config=config,
         )
-        response = chat.send_message(message)
-        output = (response.text or "").strip()
+
+        response = chat.send_message(curr_message)
+        output = response.text or ""
 
         logger.info(
-            "Gemini call model=%s usage=%s",
+            "Gemini call model=%s params=%s usage=%s",
             getattr(response, "model_version", None),
+            params,
             getattr(response, "usage_metadata", None),
         )
 
