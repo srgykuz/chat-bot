@@ -221,7 +221,7 @@ class Session:
         Ordered from oldest to newest message.
         """
         key = self._history_key(chat_id)
-        items = cast(List[str], self.redis.lrange(key, -self.settings.max_history_messages, -1))
+        items = cast(List[str], self.redis.lrange(key, -self.settings.history_limit, -1))
         history: List[Message] = []
 
         for item in items:
@@ -243,7 +243,7 @@ class Session:
         pipe = self.redis.pipeline()
 
         pipe.rpush(key, value)
-        pipe.ltrim(key, -self.settings.max_history_messages, -1)
+        pipe.ltrim(key, -self.settings.history_limit, -1)
 
         pipe.execute()
 
@@ -256,7 +256,7 @@ class Session:
         num_assistant = sum(1 for msg in history if msg.role == MessageRole.ASSISTANT)
 
         return HistoryInfo(
-            max_messages=self.settings.max_history_messages,
+            max_messages=self.settings.history_limit,
             num_messages=len(history),
             num_user_messages=num_user,
             num_assistant_messages=num_assistant,

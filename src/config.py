@@ -50,7 +50,7 @@ class Settings(BaseSettings):
         description="Redis connection URL.",
     )
 
-    max_history_messages: int = Field(
+    history_limit: int = Field(
         default=50,
         description="Maximum number of recent messages to keep in chat history per user.",
     )
