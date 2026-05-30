@@ -75,7 +75,7 @@ class HistoryInfo:
         return asdict(self)
 
 
-class Session:
+class SessionClient:
     """
     Manages per-user and per-chat state: history, persona, etc.
     A data in the state must not be considered as permanent as it

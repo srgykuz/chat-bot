@@ -5,7 +5,7 @@ import asyncio
 import logging
 from typing import Dict, Any
 from src.config import get_settings
-from src.bot import process_update, telegram_client, session_store
+from src.bot import handle_update, telegram_client, session_client
 from src.telegram import TelegramPoller
 
 # Configure logging
@@ -30,7 +30,7 @@ async def startup_event():
 
     if settings.telegram_use_polling:
         logger.info("Starting Telegram long polling in development mode")
-        app.state.poller = TelegramPoller(process_update)
+        app.state.poller = TelegramPoller(handle_update)
         app.state.poller_task = asyncio.create_task(app.state.poller.start())
 
 
@@ -49,7 +49,7 @@ async def shutdown_event():
         await app.state.poller.aclose()
 
     await telegram_client.aclose()
-    session_store.close()
+    session_client.close()
 
 
 @app.get("/health")
@@ -68,7 +68,7 @@ async def webhook(request: Request) -> JSONResponse:
         update = await request.json()
         logger.info(f"Received update: {update.get('update_id')}")
 
-        await process_update(update)
+        await handle_update(update)
         return JSONResponse({"ok": True})
 
     except Exception as e:
