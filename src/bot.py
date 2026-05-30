@@ -13,6 +13,15 @@ session_client = SessionClient()
 model_client = ModelClient()
 
 
+async def aclose() -> None:
+    """
+    Closes used clients.
+    """
+    await telegram_client.aclose()
+    session_client.close()
+    model_client.close()
+
+
 async def handle_update(update: Dict[str, Any]) -> None:
     """
     Handles Telegram update item.
