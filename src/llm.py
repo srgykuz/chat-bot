@@ -27,6 +27,13 @@ class ProviderClient(ABC):
         self.parent = parent
 
     @abstractmethod
+    def close(self) -> None:
+        """
+        Closes an underlying resources.
+        """
+        pass
+
+    @abstractmethod
     def chat(self, context: List[Message]) -> str:
         """
         Generates a response for the supplied chat context.
@@ -34,6 +41,7 @@ class ProviderClient(ABC):
         and user's current message the model should respond to.
         Output is a generated assistant message text.
         """
+        pass
 
 
 class ModelClient:
@@ -44,6 +52,12 @@ class ModelClient:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.provider: ProviderClient = self.create_provider()
+
+    def close(self) -> None:
+        """
+        Closes an underlying resources.
+        """
+        self.provider.close()
 
     def create_provider(self) -> ProviderClient:
         """
@@ -142,6 +156,9 @@ class OpenAIClient(ProviderClient):
         super().__init__(parent)
         self.client = openai.OpenAI(api_key=self.parent.settings.openai_api_key)
 
+    def close(self) -> None:
+        self.client.close()
+
     def chat(self, context: List[Message]) -> str:
         params = self.parent.load_model_params()
 
@@ -173,6 +190,9 @@ class GeminiClient(ProviderClient):
     def __init__(self, parent: "ModelClient") -> None:
         super().__init__(parent)
         self.client = genai.Client(api_key=self.parent.settings.gemini_api_key)
+
+    def close(self) -> None:
+        self.client.close()
 
     def chat(self, context: List[Message]) -> str:
         system_prompt = ""
