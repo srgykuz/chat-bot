@@ -37,7 +37,7 @@ class Settings(BaseSettings):
         description="Path to the system prompt text file.",
     )
     model_params_path: str = Field(
-        default="./llm/params.json",
+        default="./llm/openai.json",
         description="Path to the LLM model parameters JSON file.",
     )
     persona_dir_path: str = Field(
