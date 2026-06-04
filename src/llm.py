@@ -109,7 +109,18 @@ class ModelClient:
         template = self.load_system_prompt()
 
         persona_tz = timezone(timedelta(hours=persona.tz_offset()))
-        persona_time = datetime.now(tz=persona_tz).strftime("%Y-%m-%d %H:%M:%S")
+        persona_dt = datetime.now(tz=persona_tz)
+        persona_now = persona_dt.strftime("%Y-%m-%d %H:%M:%S")
+        persona_weekday = [
+            "Понедельник",
+            "Вторник",
+            "Среда",
+            "Четверг",
+            "Пятница",
+            "Суббота",
+            "Воскресенье",
+        ][persona_dt.weekday()]
+        persona_time = f"{persona_now} {persona_weekday}"
 
         mapping = {
             "persona_time": persona_time,
