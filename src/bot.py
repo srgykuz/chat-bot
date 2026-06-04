@@ -83,7 +83,7 @@ async def handle_command(message: TelegramMessage) -> None:
             else:
                 response = f"Persona {name} not found."
     elif command == "/list_persona":
-        names = [p.name for p in session_client.personas]
+        names = [p.name for p in session_client.load_personas()]
 
         if names:
             names = [f"`{n}`" for n in names]

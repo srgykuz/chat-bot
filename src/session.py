@@ -84,10 +84,6 @@ class SessionClient:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.redis = Redis.from_url(self.settings.redis_url, decode_responses=True)
-        self.personas = self.load_personas(Path(self.settings.persona_dir_path))
-
-        if not self.personas:
-            raise RuntimeError(f"No personas found in the catalog: {self.settings.persona_dir_path}")
 
     def close(self) -> None:
         """
@@ -118,7 +114,7 @@ class SessionClient:
         """
         return f"session:{chat_id}:history"
 
-    def load_personas(self, dir: Path) -> List[Persona]:
+    def load_personas(self) -> List[Persona]:
         """
         Loads persona prompts from the specified directory.
         Empty personas are ignored.
@@ -126,6 +122,8 @@ class SessionClient:
         Each persona should be defined in a separate .txt file, where the filename
         (without extension) is the persona name, and the file content is the persona prompt.
         """
+        dir = Path(self.settings.persona_dir_path)
+
         if not dir.exists() or not dir.is_dir():
             raise RuntimeError(f"Persona directory not found: {dir}")
 
@@ -147,6 +145,9 @@ class SessionClient:
 
             personas.append(Persona(name=name, prompt=prompt))
 
+        if not personas:
+            raise RuntimeError(f"No personas found in the catalog: {self.settings.persona_dir_path}")
+
         return personas
 
     def get_persona(self, chat_id: int) -> Optional[Persona]:
@@ -154,24 +155,26 @@ class SessionClient:
         Returns the currently set persona for the given chat ID, or None if no persona is set.
         """
         key = self._persona_key(chat_id)
-        raw = cast(Optional[str], self.redis.get(key))
+        persona_name = cast(Optional[str], self.redis.get(key))
 
-        if raw is None:
+        if persona_name is None:
             return None
 
-        data = json.loads(raw)
-        persona = Persona(**data)
+        personas = self.load_personas()
 
-        return persona
+        for persona in personas:
+            if persona.name == persona_name:
+                return persona
+
+        return None
 
     def set_persona(self, chat_id: int, persona: Persona) -> None:
         """
         Sets the given persona for the specified chat ID.
         """
         key = self._persona_key(chat_id)
-        value = json.dumps(persona.to_dict())
 
-        self.redis.set(key, value)
+        self.redis.set(key, persona.name)
 
     def select_persona(self, persona_name: Optional[str] = None) -> Persona:
         """
@@ -181,14 +184,15 @@ class SessionClient:
         If no persona is found, raises an exception. If persona_name is not provided, then
         selects a random persona from the catalog.
         """
+        personas = self.load_personas()
         persona_name = persona_name.strip() if persona_name else None
 
         if not persona_name:
-            return random.choice(self.personas)
+            return random.choice(personas)
 
         persona: Optional[Persona] = None
 
-        for p in self.personas:
+        for p in personas:
             if p.name.casefold() == persona_name.casefold():
                 persona = p
                 break
