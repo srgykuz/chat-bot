@@ -1,6 +1,7 @@
 import json
 import random
-from dataclasses import dataclass, asdict
+import time
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, List, Optional, cast
 from enum import StrEnum
@@ -26,6 +27,7 @@ class Message:
     """
     role: MessageRole
     content: str
+    timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, str]:
         return asdict(self)
