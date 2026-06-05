@@ -186,7 +186,10 @@ class OpenAIClient(ProviderClient):
     def chat(self, context: List[Message]) -> str:
         params = self.parent.load_model_params()
 
-        messages = [msg.to_dict() for msg in context]
+        messages = [
+            {"role": msg.role.value, "content": msg.content}
+            for msg in context
+        ]
         params["messages"] = messages
 
         completion = self.client.chat.completions.create(**params)
