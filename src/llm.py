@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import openai
 from google import genai
@@ -13,6 +13,7 @@ import yaml
 
 from src.config import get_settings
 from src.session import Message, MessageRole, Persona, User
+from src.weather import WeatherInfo
 
 
 logger = logging.getLogger(__name__)
@@ -101,7 +102,12 @@ class ModelClient:
 
         return output
 
-    def build_system_prompt(self, persona: Persona, user: User) -> str:
+    def build_system_prompt(
+        self,
+        persona: Persona,
+        user: User,
+        weather: Optional[WeatherInfo] = None,
+    ) -> str:
         """
         Creates a system prompt by loading the template and filling all the
         required placeholders. You should pass returned string as system prompt
@@ -123,8 +129,14 @@ class ModelClient:
         ][persona_dt.weekday()]
         persona_time = f"{persona_now} {persona_weekday}"
 
+        persona_weather = ""
+
+        if weather:
+            persona_weather = f"{weather.temp_c}°C, {weather.condition_text}"
+
         mapping = {
             "persona_time": persona_time,
+            "persona_weather": persona_weather,
             "persona_prompt": persona.prompt,
             "user_name": user.first_name or "",
             "user_country": user.country() or "",

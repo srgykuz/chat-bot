@@ -42,13 +42,14 @@ class Persona:
     id: str
     name: str
     timezone: str
+    city: str
     prompt: str
 
     def to_dict(self) -> Dict[str, str]:
         return asdict(self)
 
     def is_valid(self) -> bool:
-        return bool(self.id and self.name and self.timezone and self.prompt)
+        return bool(self.id and self.name and self.timezone and self.city and self.prompt)
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +152,7 @@ class SessionClient:
             id = str(params.get("id", None) or "").strip()
             name = str(params.get("name", None) or "").strip()
             timezone = str(params.get("timezone", None) or "").strip()
+            city = str(params.get("city", None) or "").strip()
 
             prompt_path = persona_dir / "prompt.md"
 
@@ -166,6 +168,7 @@ class SessionClient:
                 id=id,
                 name=name,
                 timezone=timezone,
+                city=city,
                 prompt=prompt,
             )
 

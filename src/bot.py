@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 
 from src.llm import ModelClient
 from src.session import Message, MessageRole, SessionClient, Persona, User
+from src.weather import fetch_weather, WeatherInfo
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 
 
@@ -147,8 +148,14 @@ async def handle_message(message: TelegramMessage) -> None:
         first_name=message.first_name,
         last_name=message.last_name,
     )
-    system_prompt = model_client.build_system_prompt(persona, user)
+    weather: Optional[WeatherInfo] = None
 
+    try:
+        weather = await fetch_weather(persona.city, lang="ru")
+    except Exception as e:
+        logger.error(f"Error fetching weather info: {e}")
+
+    system_prompt = model_client.build_system_prompt(persona, user, weather)
     response = ""
     success = False
 

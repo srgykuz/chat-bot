@@ -34,6 +34,15 @@ class Settings(BaseSettings):
         description="OpenAI API key.",
     )
 
+    weatherapi_api_key: str = Field(
+        default="",
+        description="https://www.weatherapi.com API key.",
+    )
+    weatherapi_cache_ttl: int = Field(
+        default=15 * 60,
+        description="Time in seconds to cache fetched weather info.",
+    )
+
     system_path: str = Field(
         default="./system",
         description="Path to the directory that stores system prompt and model params.",
