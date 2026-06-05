@@ -3,6 +3,7 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redis import Redis
+import httpx
 
 
 class Settings(BaseSettings):
@@ -66,6 +67,13 @@ def get_redis() -> Redis:
     settings = get_settings()
 
     return Redis.from_url(settings.redis_url, decode_responses=True)
+
+
+@lru_cache()
+def get_httpx() -> httpx.AsyncClient:
+    """Returns an HTTPX AsyncClient instance."""
+
+    return httpx.AsyncClient(timeout=10)
 
 
 if __name__ == "__main__":
