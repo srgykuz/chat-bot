@@ -57,9 +57,6 @@ class Persona:
     city: str
     prompt: str
 
-    def to_dict(self) -> Dict[str, str]:
-        return asdict(self)
-
     def is_valid(self) -> bool:
         return bool(self.id and self.name and self.timezone and self.city and self.prompt)
 
@@ -71,9 +68,6 @@ class User:
     """
     first_name: Optional[str]
     last_name: Optional[str]
-
-    def to_dict(self) -> Dict[str, str]:
-        return asdict(self)
 
     def country(self) -> Optional[str]:
         return "Россия"
@@ -88,9 +82,6 @@ class HistoryInfo:
     num_messages: int
     num_user_messages: int
     num_assistant_messages: int
-
-    def to_dict(self) -> Dict[str, int]:
-        return asdict(self)
 
 
 class SessionClient:
