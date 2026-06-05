@@ -5,7 +5,10 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, List, Optional, cast
 from enum import StrEnum
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
+import yaml
 from redis import Redis
 
 from src.config import get_settings
@@ -38,14 +41,16 @@ class Persona:
     """
     Information about a persona that we are mimicking in the conversation.
     """
+    id: str
     name: str
+    timezone: str
     prompt: str
 
     def to_dict(self) -> Dict[str, str]:
         return asdict(self)
 
-    def tz_offset(self) -> int:
-        return 3
+    def is_valid(self) -> bool:
+        return bool(self.id and self.name and self.timezone and self.prompt)
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,37 +123,61 @@ class SessionClient:
 
     def load_personas(self) -> List[Persona]:
         """
-        Loads persona prompts from the specified directory.
-        Empty personas are ignored.
+        Loads persona definitions from the specified directory.
 
-        Each persona should be defined in a separate .txt file, where the filename
-        (without extension) is the persona name, and the file content is the persona prompt.
+        Each persona should be defined in a separate directory using files:
+        params.yml and prompt.md. Empty personas are ignored.
         """
-        dir = Path(self.settings.persona_dir_path)
+        dir = Path(self.settings.personas_path)
 
         if not dir.exists() or not dir.is_dir():
             raise RuntimeError(f"Persona directory not found: {dir}")
 
         personas: List[Persona] = []
 
-        for file in sorted(dir.glob("*.txt")):
-            if not file.is_file():
+        for persona_dir in sorted(dir.iterdir()):
+            if not persona_dir.is_dir():
                 continue
 
-            name = file.stem.strip()
+            params_path = persona_dir / "params.yml"
 
-            if not name:
-                raise RuntimeError(f"Persona file has invalid name: {file}")
+            if not params_path.exists() or not params_path.is_file():
+                continue
 
-            prompt = file.read_text(encoding="utf-8").strip()
+            params_raw = params_path.read_text(encoding="utf-8")
+            params = yaml.safe_load(params_raw)
+
+            if not isinstance(params, dict):
+                raise RuntimeError(f"Persona params file must contain a YAML object: {params_path}")
+
+            id = str(params.get("id", None) or "").strip()
+            name = str(params.get("name", None) or "").strip()
+            timezone = str(params.get("timezone", None) or "").strip()
+
+            prompt_path = persona_dir / "prompt.md"
+
+            if not prompt_path.exists() or not prompt_path.is_file():
+                continue
+
+            prompt = prompt_path.read_text(encoding="utf-8").strip()
 
             if not prompt:
                 continue
 
-            personas.append(Persona(name=name, prompt=prompt))
+            persona = Persona(
+                id=id,
+                name=name,
+                timezone=timezone,
+                prompt=prompt,
+            )
+
+            if not persona.is_valid():
+                raise RuntimeError(f"Persona definition is invalid: {persona_dir}")
+
+            personas.append(persona)
 
         if not personas:
-            raise RuntimeError(f"No personas found in the catalog: {self.settings.persona_dir_path}")
+            raise RuntimeError(f"No personas found in the catalog: {self.settings.personas_path}")
 
         return personas
 
@@ -157,15 +186,15 @@ class SessionClient:
         Returns the currently set persona for the given chat ID, or None if no persona is set.
         """
         key = self._persona_key(chat_id)
-        persona_name = cast(Optional[str], self.redis.get(key))
+        persona_id = cast(Optional[str], self.redis.get(key))
 
-        if persona_name is None:
+        if persona_id is None:
             return None
 
         personas = self.load_personas()
 
         for persona in personas:
-            if persona.name == persona_name:
+            if persona.id == persona_id:
                 return persona
 
         return None
@@ -176,31 +205,31 @@ class SessionClient:
         """
         key = self._persona_key(chat_id)
 
-        self.redis.set(key, persona.name)
+        self.redis.set(key, persona.id)
 
-    def select_persona(self, persona_name: Optional[str] = None) -> Persona:
+    def select_persona(self, persona_id: Optional[str] = None) -> Persona:
         """
         Selects a persona from the catalog.
 
-        If persona_name is provided, tries to find a persona with that name (case-insensitive).
-        If no persona is found, raises an exception. If persona_name is not provided, then
+        If persona_id is provided, tries to find a persona with that id (case-insensitive).
+        If no persona is found, raises an exception. If persona_id is not provided, then
         selects a random persona from the catalog.
         """
         personas = self.load_personas()
-        persona_name = persona_name.strip() if persona_name else None
+        persona_id = persona_id.strip() if persona_id else None
 
-        if not persona_name:
+        if not persona_id:
             return random.choice(personas)
 
         persona: Optional[Persona] = None
 
         for p in personas:
-            if p.name.casefold() == persona_name.casefold():
+            if p.id.casefold() == persona_id.casefold():
                 persona = p
                 break
 
         if not persona:
-            raise ValueError(f"Persona not found: {persona_name}")
+            raise ValueError(f"Persona not found: {persona_id}")
 
         return persona
 

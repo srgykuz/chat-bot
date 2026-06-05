@@ -2,7 +2,8 @@ import json
 import logging
 import asyncio
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -108,7 +109,7 @@ class ModelClient:
         """
         template = self.load_system_prompt()
 
-        persona_tz = timezone(timedelta(hours=persona.tz_offset()))
+        persona_tz = ZoneInfo(persona.timezone)
         persona_dt = datetime.now(tz=persona_tz)
         persona_now = persona_dt.strftime("%Y-%m-%d %H:%M:%S")
         persona_weekday = [

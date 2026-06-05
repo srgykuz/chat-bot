@@ -40,9 +40,9 @@ class Settings(BaseSettings):
         default="./llm/openai.json",
         description="Path to the LLM model parameters JSON file.",
     )
-    persona_dir_path: str = Field(
-        default="./llm/personas",
-        description="Path to the directory that stores persona prompt files.",
+    personas_path: str = Field(
+        default="./personas",
+        description="Path to the directory that stores persona definitions.",
     )
 
     redis_url: str = Field(

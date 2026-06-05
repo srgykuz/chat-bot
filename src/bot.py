@@ -56,6 +56,7 @@ async def handle_command(message: TelegramMessage) -> None:
         if persona:
             response = (
                 "*Current persona:*\n"
+                f"ID: `{persona.id}`\n"
                 f"Name: `{persona.name}`\n"
             )
         else:
@@ -67,27 +68,27 @@ async def handle_command(message: TelegramMessage) -> None:
         parts = text.split(maxsplit=1)
 
         if len(parts) < 2 or not parts[1].strip():
-            response = "Usage: /set\\_persona <Name>"
+            response = "Usage: /set\\_persona <id>"
         else:
-            name = parts[1].strip()
+            persona_id = parts[1].strip()
             persona: Optional[Persona] = None
 
             try:
-                persona = session_client.select_persona(name)
+                persona = session_client.select_persona(persona_id)
             except Exception:
                 persona = None
 
             if persona:
                 session_client.set_persona(chat_id, persona)
-                response = f"Persona set to {persona.name}."
+                response = f"Persona set to {persona.id}."
             else:
-                response = f"Persona {name} not found."
+                response = f"Persona {persona_id} not found."
     elif command == "/list_persona":
-        names = [p.name for p in session_client.load_personas()]
+        ids = [p.id for p in session_client.load_personas()]
 
-        if names:
-            names = [f"`{n}`" for n in names]
-            response = "*Available personas:*\n" + "\n".join(names)
+        if ids:
+            ids = [f"`{n}`" for n in ids]
+            response = "*Available personas:*\n" + "\n".join(ids)
         else:
             response = "No personas available."
     elif command == "/get_history":
@@ -108,7 +109,7 @@ async def handle_command(message: TelegramMessage) -> None:
     else:
         response = (
             "Persona commands:\n"
-            "/set\\_persona <name>\n"
+            "/set\\_persona <id>\n"
             "/get\\_persona\n"
             "/list\\_persona\n"
             "/clear\\_persona\n"

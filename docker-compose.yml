@@ -24,6 +24,8 @@ services:
     volumes:
       - ./llm:/app/llm:ro
       - ./llm.d:/app/llm.d:ro
+      - ./personas:/app/personas:ro
+      - ./personas.d:/app/personas.d:ro
     env_file:
       - .env
     restart: unless-stopped
@@ -42,6 +44,8 @@ services:
     volumes:
       - ./llm:/app/llm:ro
       - ./llm.d:/app/llm.d:ro
+      - ./personas:/app/personas:ro
+      - ./personas.d:/app/personas.d:ro
     env_file:
       - .env
     restart: unless-stopped
