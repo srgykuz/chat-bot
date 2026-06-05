@@ -3,7 +3,7 @@ import random
 import time
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Dict, List, Optional, cast
+from typing import Dict, List, Optional, Any, cast
 from enum import StrEnum
 
 import yaml
@@ -32,6 +32,18 @@ class Message:
 
     def to_dict(self) -> Dict[str, str]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Message":
+        role = MessageRole(data.get("role", ""))
+        content = str(data.get("content", ""))
+        timestamp = float(data.get("timestamp", 0.0))
+
+        return cls(
+            role=role,
+            content=content,
+            timestamp=timestamp,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,7 +277,8 @@ class SessionClient:
                 continue
 
             data = json.loads(item)
-            history.append(Message(**data))
+            msg = Message.from_dict(data)
+            history.append(msg)
 
         return history
 
