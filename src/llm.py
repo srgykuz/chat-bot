@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import openai
 from google import genai
 from google.genai.types import GenerateContentConfig, ModelContent, Part, UserContent
+import ollama
 import yaml
 
 from src.config import get_settings
@@ -73,6 +74,9 @@ class ModelClient:
 
         if self.settings.gemini_api_key:
             return GeminiClient(self)
+
+        if self.settings.ollama_host:
+            return OllamaClient(self)
 
         raise RuntimeError("No supported LLM provider is configured.")
 
@@ -257,6 +261,56 @@ class GeminiClient(ProviderClient):
             getattr(response, "model_version", None),
             params,
             getattr(response, "usage_metadata", None),
+        )
+
+        return output
+
+
+class OllamaClient(ProviderClient):
+    name = "ollama"
+
+    def __init__(self, parent: "ModelClient") -> None:
+        super().__init__(parent)
+        headers = {}
+
+        if self.parent.settings.ollama_api_key:
+            headers["Authorization"] = f"Bearer {self.parent.settings.ollama_api_key}"
+
+        self.client = ollama.Client(host=self.parent.settings.ollama_host, headers=headers)
+
+    def close(self) -> None:
+        self.client.close()
+
+    def chat(self, context: List[Message]) -> str:
+        params = self.parent.load_model_params()
+
+        model = params.pop("model", "")
+        messages = [
+            {"role": msg.role.value, "content": msg.content}
+            for msg in context
+        ]
+
+        response = self.client.chat(model=model, messages=messages, **params)
+        output = response.message.content
+
+        if not output:
+            raise RuntimeError("No response.")
+
+        params_log = dict(params)
+        usage = {
+            "total_duration": response.total_duration / 1e9,
+            "load_duration": response.load_duration / 1e9,
+            "prompt_eval_count": response.prompt_eval_count,
+            "prompt_eval_duration": response.prompt_eval_duration / 1e9,
+            "eval_count": response.eval_count,
+            "eval_duration": response.eval_duration / 1e9,
+        }
+
+        logger.info(
+            "Ollama call model=%s params=%s usage=%s",
+            model,
+            params_log,
+            usage,
         )
 
         return output

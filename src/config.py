@@ -33,6 +33,14 @@ class Settings(BaseSettings):
         default="",
         description="OpenAI API key.",
     )
+    ollama_host: str = Field(
+        default="",
+        description="Ollama host URL (e.g. http://localhost:11434 or https://ollama.com).",
+    )
+    ollama_api_key: str = Field(
+        default="",
+        description="Ollama API key.",
+    )
 
     weatherapi_api_key: str = Field(
         default="",
