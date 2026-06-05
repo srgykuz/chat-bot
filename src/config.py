@@ -32,13 +32,9 @@ class Settings(BaseSettings):
         description="OpenAI API key.",
     )
 
-    system_prompt_path: str = Field(
-        default="./llm/system.txt",
-        description="Path to the system prompt text file.",
-    )
-    model_params_path: str = Field(
-        default="./llm/openai.json",
-        description="Path to the LLM model parameters JSON file.",
+    system_path: str = Field(
+        default="./system",
+        description="Path to the directory that stores system prompt and model params.",
     )
     personas_path: str = Field(
         default="./personas",

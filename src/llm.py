@@ -1,4 +1,3 @@
-import json
 import logging
 import asyncio
 from abc import ABC, abstractmethod
@@ -10,6 +9,7 @@ from typing import Any, Dict, List
 import openai
 from google import genai
 from google.genai.types import GenerateContentConfig, ModelContent, Part, UserContent
+import yaml
 
 from src.config import get_settings
 from src.session import Message, MessageRole, Persona, User
@@ -134,9 +134,9 @@ class ModelClient:
 
     def load_system_prompt(self) -> str:
         """
-        Loads the system prompt from the configured text file path.
+        Loads the system prompt from "prompt.md" file.
         """
-        path = Path(self.settings.system_prompt_path)
+        path = Path(self.settings.system_path) / "prompt.md"
 
         if not path.exists():
             raise RuntimeError(f"System prompt file not found: {path}")
@@ -145,18 +145,18 @@ class ModelClient:
 
     def load_model_params(self) -> Dict[str, Any]:
         """
-        Loads the model parameters from the configured JSON file path.
+        Loads the model parameters from "params.yml" file.
         """
-        path = Path(self.settings.model_params_path)
+        path = Path(self.settings.system_path) / "params.yml"
 
         if not path.exists():
             raise RuntimeError(f"Model params file not found: {path}")
 
         raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
+        data = yaml.safe_load(raw)
 
         if not isinstance(data, dict):
-            raise RuntimeError("Model params file must contain a JSON object at the top level.")
+            raise RuntimeError("Model params file must contain a YAML object at the top level.")
 
         return data
 

@@ -1,5 +1,5 @@
 # Project
-llm.d/*
+system.d/*
 personas.d/*
 
 # Virtual environment
