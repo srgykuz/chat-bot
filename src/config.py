@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from redis import Redis
 
 
 class Settings(BaseSettings):
@@ -57,6 +58,14 @@ def get_settings() -> Settings:
     """Returns parsed and validated settings instance."""
 
     return Settings()
+
+
+@lru_cache()
+def get_redis() -> Redis:
+    """Returns a Redis client instance based on the settings."""
+    settings = get_settings()
+
+    return Redis.from_url(settings.redis_url, decode_responses=True)
 
 
 if __name__ == "__main__":

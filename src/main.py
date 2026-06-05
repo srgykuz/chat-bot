@@ -5,7 +5,7 @@ from typing import Dict, Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from src.config import get_settings
+from src.config import get_settings, get_redis
 from src.bot import handle_update, aclose as bot_aclose
 from src.telegram import TelegramPoller
 
@@ -46,6 +46,7 @@ async def on_shutdown():
         await app.state.poller.aclose()
 
     await bot_aclose()
+    get_redis().close()
 
 
 @app.get("/", status_code=404, response_class=PlainTextResponse)
