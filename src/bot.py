@@ -176,9 +176,8 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
             texts.append(text)
 
     if not texts:
+        logger.info(f"No messages to process for chat {chat_id}")
         return
-
-    await telegram_client.send_chat_action(chat_id, action="typing")
 
     history = session_client.get_history(chat_id)
 
@@ -213,10 +212,27 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         for text in texts:
             session_client.append_history(chat_id, Message(role=MessageRole.USER, content=text))
 
-        session_client.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=response))
+        if response:
+            session_client.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=response))
 
-    await telegram_client.send_message(chat_id=chat_id, text=response)
     logger.info(f"Responding to chat {chat_id} from {messages[-1].username}: {response}")
+
+    if response:
+        await telegram_client.send_chat_action(chat_id, action="typing")
+
+        delay = calc_typing_duration(response)
+        await asyncio.sleep(delay)
+
+        await telegram_client.send_message(chat_id=chat_id, text=response)
+
+
+def calc_typing_duration(text: str) -> float:
+    """
+    Returns number of seconds to simulate human typing duration for a given text.
+    """
+    chars_per_second = 15
+
+    return len(text) / chars_per_second
 
 
 def enqueue_flush_buffered_messages(chat_id: int, token: str) -> None:
