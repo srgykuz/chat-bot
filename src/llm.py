@@ -144,6 +144,7 @@ class ModelClient:
             "persona_prompt": persona.prompt,
             "user_name": user.first_name or "",
             "user_country": user.country() or "",
+            "output_separator": self.settings.output_separator,
         }
 
         return template.format_map(mapping)
