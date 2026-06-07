@@ -74,6 +74,10 @@ class Settings(BaseSettings):
         default=5,
         description="Time in seconds to wait for additional user messages before flushing the buffered batch.",
     )
+    output_separator: str = Field(
+        default="[SPLIT]",
+        description="Separator string to split LLM response into multiple messages.",
+    )
 
 
 @lru_cache()

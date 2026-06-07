@@ -164,7 +164,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
     """
     Handles a batch of messages that were queued using `handle_message()`.    
     """
-    texts = []
+    input = []
 
     for msg in messages:
         if msg.chat_id != chat_id:
@@ -173,15 +173,15 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         text = (msg.text or "").strip()
 
         if text:
-            texts.append(text)
+            input.append(text)
 
-    if not texts:
+    if not input:
         logger.info(f"No messages to process for chat {chat_id}")
         return
 
     history = session_client.get_history(chat_id)
 
-    for text in texts:
+    for text in input:
         history.append(Message(role=MessageRole.USER, content=text))
 
     persona = session_client.init_persona(chat_id)
@@ -208,22 +208,25 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         success = False
         logger.error("LLM call error: %s", e, exc_info=True)
 
+    output = response.split(settings.output_separator)
+    output = [s.strip() for s in output if s.strip()]
+
     if success:
-        for text in texts:
+        for text in input:
             session_client.append_history(chat_id, Message(role=MessageRole.USER, content=text))
 
-        if response:
-            session_client.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=response))
+        for text in output:
+            session_client.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=text))
 
     logger.info(f"Responding to chat {chat_id} from {messages[-1].username}: {response}")
 
-    if response:
+    for text in output:
         await telegram_client.send_chat_action(chat_id, action="typing")
 
-        delay = calc_typing_duration(response)
+        delay = calc_typing_duration(text)
         await asyncio.sleep(delay)
 
-        await telegram_client.send_message(chat_id=chat_id, text=response)
+        await telegram_client.send_message(chat_id=chat_id, text=text)
 
 
 def calc_typing_duration(text: str) -> float:
