@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import logging
 from typing import Any, Callable, Coroutine, Dict, Optional
 
@@ -25,6 +25,23 @@ class TelegramMessage:
     last_name: Optional[str]
     text: Optional[str]
     date: Optional[int]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TelegramMessage":
+        return cls(
+            update_id=data.get("update_id"),
+            message_id=data.get("message_id"),
+            chat_id=data.get("chat_id"),
+            user_id=data.get("user_id"),
+            username=data.get("username"),
+            first_name=data.get("first_name"),
+            last_name=data.get("last_name"),
+            text=data.get("text"),
+            date=data.get("date"),
+        )
 
 
 def parse_update(update: Dict[str, Any]) -> Optional[TelegramMessage]:

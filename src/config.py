@@ -3,6 +3,7 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redis import Redis
+from rq import Queue
 import httpx
 
 
@@ -69,6 +70,10 @@ class Settings(BaseSettings):
         default=50,
         description="Maximum number of recent messages to keep in chat history per user.",
     )
+    chat_flush_interval: int = Field(
+        default=5,
+        description="Time in seconds to wait for additional user messages before flushing the buffered batch.",
+    )
 
 
 @lru_cache()
@@ -79,11 +84,19 @@ def get_settings() -> Settings:
 
 
 @lru_cache()
-def get_redis() -> Redis:
+def get_redis(decode_responses: bool = True) -> Redis:
     """Returns a Redis client instance based on the settings."""
     settings = get_settings()
 
-    return Redis.from_url(settings.redis_url, decode_responses=True)
+    return Redis.from_url(settings.redis_url, decode_responses=decode_responses)
+
+
+@lru_cache()
+def get_queue() -> Queue:
+    """Returns an RQ Queue instance based on the settings."""
+    redis = get_redis(decode_responses=False)
+
+    return Queue("default", connection=redis)
 
 
 @lru_cache()

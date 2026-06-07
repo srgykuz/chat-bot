@@ -1,9 +1,8 @@
 import logging
 
-from redis import Redis
-from rq import Worker, Queue
+from rq import Worker
 
-from src.config import get_settings
+from src.config import get_redis, get_queue
 
 
 logging.basicConfig(
@@ -13,22 +12,19 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
-def main():
+def main() -> None:
     """
-    Starts RQ worker to process background tasks.
+    Starts RQ worker and scheduler.
     """
-    redis_conn = Redis.from_url(settings.redis_url, decode_responses=True)
-    queues = [
-        Queue("default", connection=redis_conn),
-    ]
+    redis = get_redis(decode_responses=False)
+    queue = get_queue()
 
-    logger.info("Starting RQ worker for queues: %s", [q.name for q in queues])
+    logger.info(f"Starting RQ worker for queue: {queue.name}")
 
-    worker = Worker(queues, connection=redis_conn)
-    worker.work()
+    worker = Worker(queue, connection=redis)
+    worker.work(with_scheduler=True)
 
 
 if __name__ == "__main__":

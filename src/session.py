@@ -7,9 +7,10 @@ from typing import Dict, List, Optional, Any, cast
 from enum import StrEnum
 
 import yaml
-from redis import Redis
+from redis import Redis, WatchError
 
 from src.config import get_settings
+from src.telegram import TelegramMessage
 
 
 class MessageRole(StrEnum):
@@ -108,6 +109,9 @@ class SessionClient:
 
         pipe.delete(self._history_key(chat_id))
         pipe.delete(self._persona_key(chat_id))
+        pipe.delete(self._messages_pending_key(chat_id))
+        pipe.delete(self._messages_token_key(chat_id))
+        pipe.delete(self._messages_processing_key(chat_id))
 
         pipe.execute()
 
@@ -122,6 +126,24 @@ class SessionClient:
         Returns the Redis key for storing the conversation history of a specific chat.
         """
         return f"session:{chat_id}:history"
+
+    def _messages_pending_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing pending messages of a specific chat.
+        """
+        return f"session:{chat_id}:messages_pending"
+
+    def _messages_token_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing the current flush token for a specific chat.
+        """
+        return f"session:{chat_id}:messages_token"
+
+    def _messages_processing_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing messages that are currently being processed for a specific chat.
+        """
+        return f"session:{chat_id}:messages_processing"
 
     def load_personas(self) -> List[Persona]:
         """
@@ -301,3 +323,87 @@ class SessionClient:
             num_user_messages=num_user,
             num_assistant_messages=num_assistant,
         )
+
+    def buffer_message(self, chat_id: int, message: TelegramMessage) -> str:
+        """
+        Stores a Telegram message in the per-chat buffer and refreshes its flush token.
+
+        Returns new flush token which you should pass in flush_buffered_messages() to
+        pop all buffered messages.
+        """
+        payload = json.dumps(message.to_dict())
+        pipe = self.redis.pipeline()
+
+        pipe.rpush(self._messages_pending_key(chat_id), payload)
+        pipe.incr(self._messages_token_key(chat_id))
+
+        result = pipe.execute()
+        token = str(result[-1])
+
+        # Used for optimistic locking.
+        return token
+
+    def flush_buffered_messages(self, chat_id: int, flush_token: str) -> Optional[List[TelegramMessage]]:
+        """
+        Returns all messages that were buffered using buffer_message() and 
+        clears the buffer, or returns None if new call of buffer_message()
+        was made during execution of this function.
+
+        flush_token is an output of buffer_message(). If new call of buffer_message()
+        was made, then previous flush token will expire. If you calling this
+        function with expired token, then this function will return None, which means
+        new call of buffer_message() was made and the content has changed. It is 
+        expected that you will repeat this function call with the new token to
+        claim the buffer.
+        """
+        pending_key = self._messages_pending_key(chat_id)
+        token_key = self._messages_token_key(chat_id)
+        processing_key = self._messages_processing_key(chat_id)
+
+        while True:
+            try:
+                with self.redis.pipeline() as pipe:
+                    # Watch for parallel buffer_message() calls.
+                    pipe.watch(pending_key, token_key)
+
+                    current_token = pipe.get(token_key)
+
+                    if current_token != flush_token:
+                        pipe.unwatch()
+
+                        # Either buffer_message() or another 
+                        # claim_buffered_messages() has finished.
+                        return None
+
+                    if not pipe.exists(pending_key):
+                        pipe.unwatch()
+
+                        # Another claim_buffered_messages() has finished.
+                        return None
+
+                    pipe.multi()
+                    pipe.rename(pending_key, processing_key)
+                    pipe.delete(token_key)
+                    pipe.execute()
+
+                    break
+            except WatchError:
+                # buffer_message() was called and the data has been modified.
+                # Let's process again but with fresh data.
+                continue
+
+        items = cast(List[str], self.redis.lrange(processing_key, 0, -1))
+        self.redis.delete(processing_key)
+
+        messages: List[TelegramMessage] = []
+
+        for item in items:
+            if not item:
+                continue
+
+            data = json.loads(item)
+            message = TelegramMessage.from_dict(data)
+
+            messages.append(message)
+
+        return messages
