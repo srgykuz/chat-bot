@@ -48,4 +48,3 @@ Assistant: и че делать будешь?
 Текущее время: {{ persona_time }}
 Текущая погода: {{ persona_weather }}
 Имя собеседника: {{ user_name }}
-Страна собеседника: {{ user_country }}

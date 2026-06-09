@@ -147,7 +147,6 @@ class ModelClient:
             "persona_time": persona_time,
             "persona_weather": persona_weather,
             "user_name": user.first_name or "",
-            "user_country": user.country() or "",
             "output_separator": self.settings.output_separator,
         }
 

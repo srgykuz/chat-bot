@@ -70,9 +70,6 @@ class User:
     first_name: Optional[str]
     last_name: Optional[str]
 
-    def country(self) -> Optional[str]:
-        return "Россия"
-
 
 @dataclass(frozen=True, slots=True)
 class HistoryInfo:
