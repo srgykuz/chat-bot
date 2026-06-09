@@ -162,7 +162,7 @@ async def handle_message(message: TelegramMessage) -> None:
 
 async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]) -> None:
     """
-    Handles a batch of messages that were queued using `handle_message()`.    
+    Handles a batch of messages that were queued using `handle_message()`.
     """
     input = []
 

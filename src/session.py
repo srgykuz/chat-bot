@@ -345,14 +345,14 @@ class SessionClient:
 
     def flush_buffered_messages(self, chat_id: int, flush_token: str) -> Optional[List[TelegramMessage]]:
         """
-        Returns all messages that were buffered using buffer_message() and 
+        Returns all messages that were buffered using buffer_message() and
         clears the buffer, or returns None if new call of buffer_message()
         was made during execution of this function.
 
         flush_token is an output of buffer_message(). If new call of buffer_message()
         was made, then previous flush token will expire. If you calling this
         function with expired token, then this function will return None, which means
-        new call of buffer_message() was made and the content has changed. It is 
+        new call of buffer_message() was made and the content has changed. It is
         expected that you will repeat this function call with the new token to
         claim the buffer.
         """
@@ -371,7 +371,7 @@ class SessionClient:
                     if current_token != flush_token:
                         pipe.unwatch()
 
-                        # Either buffer_message() or another 
+                        # Either buffer_message() or another
                         # claim_buffered_messages() has finished.
                         return None
 
