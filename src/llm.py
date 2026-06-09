@@ -228,19 +228,35 @@ class GeminiClient(ProviderClient):
 
     def chat(self, context: List[Message]) -> str:
         system_prompt = ""
-        curr_message = context[-1].content
         history = []
 
-        for msg in context[:-1]:
+        for msg in context:
+            content = None
+
             if msg.role == MessageRole.SYSTEM:
                 system_prompt = msg.content
+                continue
             elif msg.role == MessageRole.USER:
-                history.append(UserContent(parts=[Part(text=msg.content)]))
+                content = UserContent(parts=[Part(text=msg.content)])
             elif msg.role == MessageRole.ASSISTANT:
-                history.append(ModelContent(parts=[Part(text=msg.content)]))
+                content = ModelContent(parts=[Part(text=msg.content)])
             else:
                 raise ValueError(f"Unknown message role: {msg.role}")
+            
+            if history and isinstance(content, type(history[-1])):
+                history[-1].parts[0].text += f"\n{content.parts[0].text}"
+            else:
+                history.append(content)
 
+        if not history:
+            raise ValueError("History cannot be empty.")
+
+        last = history.pop()
+
+        if not isinstance(last, UserContent):
+            raise ValueError("Last message in context should be from user")
+
+        curr_message = last.parts[0].text
         params = self.parent.load_model_params()
         model = params.pop("model", "")
 
