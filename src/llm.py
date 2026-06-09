@@ -117,7 +117,7 @@ class ModelClient:
         self,
         persona: Persona,
         user: User,
-        weather: Optional[WeatherInfo] = None,
+        persona_weather: Optional[WeatherInfo] = None,
     ) -> str:
         """
         Creates a system prompt by loading the template and filling all the
@@ -136,18 +136,14 @@ class ModelClient:
             "Суббота",
             "Воскресенье",
         ][persona_dt.weekday()]
-        persona_time = f"{persona_now} {persona_weekday}"
-
-        persona_weather = ""
-
-        if weather:
-            persona_weather = f"{weather.temp_c}°C, {weather.condition_text}"
 
         context = {
-            "persona_time": persona_time,
+            "settings": self.settings,
+            "persona": persona,
+            "user": user,
+            "persona_now": persona_now,
+            "persona_weekday": persona_weekday,
             "persona_weather": persona_weather,
-            "user_name": user.first_name or "",
-            "output_separator": self.settings.output_separator,
         }
 
         persona_prompt = jinja.from_string(persona.prompt).render(context)
