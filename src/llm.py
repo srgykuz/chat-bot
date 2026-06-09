@@ -242,7 +242,7 @@ class GeminiClient(ProviderClient):
                 content = ModelContent(parts=[Part(text=msg.content)])
             else:
                 raise ValueError(f"Unknown message role: {msg.role}")
-            
+
             if history and isinstance(content, type(history[-1])):
                 history[-1].parts[0].text += f"\n{content.parts[0].text}"
             else:
