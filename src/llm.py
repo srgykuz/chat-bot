@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import openai
+from jinja2 import Environment, StrictUndefined
 from google import genai
 from google.genai.types import GenerateContentConfig, ModelContent, Part, UserContent
 import ollama
@@ -18,6 +19,12 @@ from src.weather import WeatherInfo
 
 
 logger = logging.getLogger(__name__)
+jinja = Environment(
+    autoescape=False,
+    undefined=StrictUndefined,
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 
 class ProviderClient(ABC):
@@ -117,8 +124,6 @@ class ModelClient:
         required placeholders. You should pass returned string as system prompt
         to the chat() method.
         """
-        template = self.load_system_prompt()
-
         persona_tz = ZoneInfo(persona.timezone)
         persona_dt = datetime.now(tz=persona_tz)
         persona_now = persona_dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -138,16 +143,20 @@ class ModelClient:
         if weather:
             persona_weather = f"{weather.temp_c}°C, {weather.condition_text}"
 
-        mapping = {
+        context = {
             "persona_time": persona_time,
             "persona_weather": persona_weather,
-            "persona_prompt": persona.prompt,
             "user_name": user.first_name or "",
             "user_country": user.country() or "",
             "output_separator": self.settings.output_separator,
         }
 
-        return template.format_map(mapping)
+        persona_prompt = jinja.from_string(persona.prompt).render(context)
+        context["persona_prompt"] = persona_prompt
+
+        system_prompt = self.load_system_prompt()
+
+        return jinja.from_string(system_prompt).render(context)
 
     def load_system_prompt(self) -> str:
         """
