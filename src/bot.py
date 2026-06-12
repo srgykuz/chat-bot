@@ -8,6 +8,7 @@ from src.session import Message, MessageRole, SessionClient, Persona, User
 from src.weather import fetch_weather, WeatherInfo
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_settings, get_queue
+from src.analytics import enqueue_memory_analytics, aclose as analytics_aclose
 
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ async def aclose() -> None:
     await telegram_client.aclose()
     session_client.close()
     model_client.close()
+    analytics_aclose()
 
 
 async def handle_update(update: Dict[str, Any]) -> None:
@@ -265,3 +267,4 @@ def flush_buffered_messages(chat_id: int, token: str) -> None:
         return
 
     asyncio.run(handle_buffered_messages(chat_id, batch))
+    enqueue_memory_analytics(chat_id, batch)

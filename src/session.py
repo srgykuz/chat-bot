@@ -109,6 +109,13 @@ class SessionClient:
         pipe.delete(self._messages_pending_key(chat_id))
         pipe.delete(self._messages_token_key(chat_id))
         pipe.delete(self._messages_processing_key(chat_id))
+        pipe.delete(self._memory_key(chat_id, "user_message_count"))
+        pipe.delete(self._memory_key(chat_id, "last_minute_bucket"))
+        pipe.delete(self._memory_key(chat_id, "user_facts"))
+        pipe.delete(self._memory_key(chat_id, "conversation_summary"))
+        pipe.delete(self._memory_key(chat_id, "user_preferences"))
+        pipe.delete(self._memory_key(chat_id, "behavior_snapshot"))
+        pipe.delete(self._memory_key(chat_id, "conversation_memory"))
 
         pipe.execute()
 
@@ -141,6 +148,79 @@ class SessionClient:
         Returns the Redis key for storing messages that are currently being processed for a specific chat.
         """
         return f"session:{chat_id}:messages_processing"
+
+    def _memory_key(self, chat_id: int, name: str) -> str:
+        """
+        Returns the Redis key for storing analytics and memory data for a specific chat.
+        """
+        return f"memory:{chat_id}:{name}"
+
+    def get_memory_document(self, chat_id: int, name: str, default: Any = None) -> Any:
+        """
+        Returns a JSON document stored in the analytics/memory namespace.
+        """
+        raw = self.redis.get(self._memory_key(chat_id, name))
+
+        if raw is None:
+            return default
+
+        try:
+            return json.loads(raw)
+        except Exception:
+            return default
+
+    def set_memory_document(self, chat_id: int, name: str, value: Any) -> None:
+        """
+        Stores a JSON document in the analytics/memory namespace.
+        """
+        self.redis.set(self._memory_key(chat_id, name), json.dumps(value, ensure_ascii=False))
+
+    def increment_memory_counter(self, chat_id: int, name: str, amount: int = 1) -> int:
+        """
+        Increments an integer counter in the analytics/memory namespace.
+        """
+        key = self._memory_key(chat_id, name)
+        return int(self.redis.incrby(key, amount))
+
+    def get_memory_counter(self, chat_id: int, name: str, default: int = 0) -> int:
+        """
+        Returns an integer counter from the analytics/memory namespace.
+        """
+        raw = self.redis.get(self._memory_key(chat_id, name))
+
+        if raw is None:
+            return default
+
+        try:
+            return int(raw)
+        except Exception:
+            return default
+
+    def get_memory_bundle(self, chat_id: int) -> Dict[str, Any]:
+        """
+        Returns all analytics/memory documents for the given chat.
+        """
+        return {
+            "user_message_count": self.get_memory_counter(chat_id, "user_message_count", 0),
+            "last_minute_bucket": self.get_memory_counter(chat_id, "last_minute_bucket", 0),
+            "user_facts": self.get_memory_document(chat_id, "user_facts", {"data": [], "updated_at": None}),
+            "conversation_summary": self.get_memory_document(
+                chat_id,
+                "conversation_summary",
+                {"summary": "", "open_loops": [], "updated_at": None},
+            ),
+            "user_preferences": self.get_memory_document(chat_id, "user_preferences", {"data": [], "updated_at": None}),
+            "behavior_snapshot": self.get_memory_document(
+                chat_id,
+                "behavior_snapshot",
+                {"updated_at": None},
+            ),
+            "conversation_memory": self.get_memory_document(
+                chat_id,
+                "conversation_memory",
+                {"likes": [], "events": [], "updated_at": None},
+            ),
+        }
 
     def load_personas(self) -> List[Persona]:
         """

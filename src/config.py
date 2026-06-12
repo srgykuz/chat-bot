@@ -56,6 +56,10 @@ class Settings(BaseSettings):
         default="./system",
         description="Path to the directory that stores system prompt and model params.",
     )
+    analytics_path: str = Field(
+        default="./analytics",
+        description="Path to the directory that stores memory and analytics prompt and model params.",
+    )
     personas_path: str = Field(
         default="./personas",
         description="Path to the directory that stores persona definitions.",
@@ -73,6 +77,26 @@ class Settings(BaseSettings):
     chat_flush_interval: int = Field(
         default=5,
         description="Time in seconds to wait for additional user messages before flushing the buffered batch.",
+    )
+    analytics_history_limit: int = Field(
+        default=24,
+        description="Maximum number of recent messages to include in a memory analytics job.",
+    )
+    analytics_user_message_interval: int = Field(
+        default=10,
+        description="Run memory analytics after every Nth user message in a chat.",
+    )
+    analytics_minute_interval: int = Field(
+        default=5,
+        description="Run memory analytics when chat activity lands on every Nth minute bucket.",
+    )
+    analytics_summary_stale_after_minutes: int = Field(
+        default=120,
+        description="Treat a rolling summary as stale after this many minutes.",
+    )
+    analytics_min_user_messages: int = Field(
+        default=3,
+        description="Minimum number of user messages required before running memory analytics.",
     )
     output_separator: str = Field(
         default="[SPLIT]",

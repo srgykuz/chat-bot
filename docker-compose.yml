@@ -24,6 +24,8 @@ services:
     volumes:
       - ./system:/app/system:ro
       - ./system.d:/app/system.d:ro
+      - ./analytics:/app/analytics:ro
+      - ./analytics.d:/app/analytics.d:ro
       - ./personas:/app/personas:ro
       - ./personas.d:/app/personas.d:ro
     env_file:
@@ -44,6 +46,8 @@ services:
     volumes:
       - ./system:/app/system:ro
       - ./system.d:/app/system.d:ro
+      - ./analytics:/app/analytics:ro
+      - ./analytics.d:/app/analytics.d:ro
       - ./personas:/app/personas:ro
       - ./personas.d:/app/personas.d:ro
     env_file:

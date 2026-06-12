@@ -157,18 +157,24 @@ class ModelClient:
         """
         Loads the system prompt from "prompt.md" file.
         """
-        path = Path(self.settings.system_path) / "prompt.md"
+        return self.load_prompt(self.settings.system_path)
+
+    def load_prompt(self, base_path: Optional[str] = None, filename: str = "prompt.md") -> str:
+        """
+        Loads a prompt template from the requested configuration directory.
+        """
+        path = Path(base_path or self.settings.system_path) / filename
 
         if not path.exists():
-            raise RuntimeError(f"System prompt file not found: {path}")
+            raise RuntimeError(f"Prompt file not found: {path}")
 
         return path.read_text(encoding="utf-8")
 
-    def load_model_params(self) -> Dict[str, Any]:
+    def load_model_params(self, base_path: Optional[str] = None, filename: str = "params.yml") -> Dict[str, Any]:
         """
         Loads the model parameters from "params.yml" file.
         """
-        path = Path(self.settings.system_path) / "params.yml"
+        path = Path(base_path or self.settings.system_path) / filename
 
         if not path.exists():
             raise RuntimeError(f"Model params file not found: {path}")
