@@ -41,6 +41,8 @@ services:
   worker:
     build: .
     command: python -m src.worker
+    deploy:
+      replicas: 5
     volumes:
       - ./system:/app/system:ro
       - ./system.d:/app/system.d:ro
