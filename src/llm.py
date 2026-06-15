@@ -11,6 +11,7 @@ from jinja2 import Environment, StrictUndefined
 from google import genai
 from google.genai.types import GenerateContentConfig, ModelContent, Part, UserContent
 import ollama
+from pydantic import BaseModel
 import yaml
 
 from src.config import get_settings
@@ -44,12 +45,19 @@ class ProviderClient(ABC):
         pass
 
     @abstractmethod
-    def chat(self, context: List[Message]) -> str:
+    def chat(
+        self,
+        context: List[Message],
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
         """
         Generates a response for the supplied chat context.
+
         The context consist of system prompt, past user and assistant messages,
         and user's current message the model should respond to.
-        Output is a generated assistant message text.
+
+        Output is a generated assistant message text. If response_format is provided,
+        output is a JSON string.
         """
         pass
 
@@ -87,7 +95,12 @@ class ModelClient:
 
         raise RuntimeError("No supported LLM provider is configured.")
 
-    async def chat(self, system_prompt: str, conversation: List[Message]) -> str:
+    async def chat(
+        self,
+        system_prompt: str,
+        conversation: List[Message],
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
         """
         Builds full chat context, calls LLM API and returns generated response.
 
@@ -97,6 +110,9 @@ class ModelClient:
         conversation should contain all previous messages from both user and assistant,
         and should contain user's current message the model should respond to. Sorted from
         oldest to newest.
+
+        Returns model response as a plain string. If response_format is provided,
+        returns JSON string which you should parse and validate using Pydantic's model_validate_json().
         """
         if not conversation:
             raise RuntimeError("Conversation must contain at least one message.")
@@ -108,7 +124,7 @@ class ModelClient:
             Message(role=MessageRole.SYSTEM, content=system_prompt)
         ] + conversation
 
-        output = await asyncio.to_thread(self.provider.chat, context)
+        output = await asyncio.to_thread(self.provider.chat, context, response_format)
         output = output.strip()
 
         return output
@@ -192,7 +208,11 @@ class OpenAIClient(ProviderClient):
     def close(self) -> None:
         self.client.close()
 
-    def chat(self, context: List[Message]) -> str:
+    def chat(
+        self,
+        context: List[Message],
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
         params = self.parent.load_model_params()
 
         messages = [
@@ -201,7 +221,10 @@ class OpenAIClient(ProviderClient):
         ]
         params["messages"] = messages
 
-        completion = self.client.chat.completions.create(**params)
+        if response_format:
+            params["response_format"] = response_format
+
+        completion = self.client.chat.completions.parse(**params)
 
         if not completion.choices:
             raise RuntimeError("No response.")
@@ -230,7 +253,11 @@ class GeminiClient(ProviderClient):
     def close(self) -> None:
         self.client.close()
 
-    def chat(self, context: List[Message]) -> str:
+    def chat(
+        self,
+        context: List[Message],
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
         system_prompt = ""
         history = []
 
@@ -263,6 +290,10 @@ class GeminiClient(ProviderClient):
         curr_message = last.parts[0].text
         params = self.parent.load_model_params()
         model = params.pop("model", "")
+
+        if response_format:
+            params["responseMimeType"] = "application/json"
+            params["responseJsonSchema"] = response_format.model_json_schema()
 
         config = GenerateContentConfig(
             system_instruction=system_prompt,
@@ -302,7 +333,11 @@ class OllamaClient(ProviderClient):
     def close(self) -> None:
         self.client.close()
 
-    def chat(self, context: List[Message]) -> str:
+    def chat(
+        self,
+        context: List[Message],
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
         params = self.parent.load_model_params()
 
         model = params.pop("model", "")
@@ -310,6 +345,9 @@ class OllamaClient(ProviderClient):
             {"role": msg.role.value, "content": msg.content}
             for msg in context
         ]
+
+        if response_format:
+            params["format"] = response_format.model_json_schema()
 
         response = self.client.chat(model=model, messages=messages, **params)
         output = response.message.content
@@ -335,3 +373,33 @@ class OllamaClient(ProviderClient):
         )
 
         return output
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    class CalendarEvent(BaseModel):
+        name: str
+        date: str
+        participants: list[str]
+
+    system_prompt = "Extract the event information."
+    conversation = [
+        Message(
+            role=MessageRole.USER,
+            content="Alice and Bob are going to a science fair on Friday."
+        )
+    ]
+    response_format = CalendarEvent
+
+    client = ModelClient()
+    output = asyncio.run(
+        client.chat(
+            system_prompt,
+            conversation,
+            response_format=response_format,
+        )
+    )
+    result = CalendarEvent.model_validate_json(output)
+
+    print(result)
