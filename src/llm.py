@@ -1,6 +1,7 @@
 import logging
 import asyncio
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -32,8 +33,6 @@ class ProviderClient(ABC):
     """
     Base class that should be implemented by provider-specific LLM client.
     """
-    name = ""
-
     def __init__(self, parent: "ModelClient") -> None:
         self.parent = parent
 
@@ -62,13 +61,27 @@ class ProviderClient(ABC):
         pass
 
 
+@dataclass(frozen=True, slots=True)
+class ModelConfig:
+    """
+    Configuration of LLM API provider.
+    """
+    provider: str
+    model: str
+    params: Dict[str, Any] = field(default_factory=dict)
+
+    def is_valid(self) -> bool:
+        return bool(self.provider and self.model)
+
+
 class ModelClient:
     """
     Wrapper for interaction with LLM API of any provider.
-    The provider is selected based on the settings (e.g. OpenAI, Gemini).
+    The provider and its parameters are loaded from the named configuration in "params.yml" file.
     """
-    def __init__(self) -> None:
+    def __init__(self, config_name: str) -> None:
         self.settings = get_settings()
+        self.config_name = config_name
         self.provider: ProviderClient = self.create_provider()
 
     def close(self) -> None:
@@ -81,19 +94,21 @@ class ModelClient:
         """
         Creates and returns an instance of the provider client.
         Using this instance you can interact with specific LLM API.
-        The provider is selected based on the settings.
-        If no supported provider is configured, raises RuntimeError.
+        The provider is selected based on the loaded config.
+        If no supported provider is configured, raises ValueError.
         """
-        if self.settings.openai_api_key:
+        config = self.load_config(self.config_name)
+
+        if config.provider == "openai":
             return OpenAIClient(self)
 
-        if self.settings.gemini_api_key:
+        if config.provider == "gemini":
             return GeminiClient(self)
 
-        if self.settings.ollama_host:
+        if config.provider == "ollama":
             return OllamaClient(self)
 
-        raise RuntimeError("No supported LLM provider is configured.")
+        raise ValueError(f"Unsupported provider: {config.provider}")
 
     async def chat(
         self,
@@ -180,29 +195,41 @@ class ModelClient:
 
         return path.read_text(encoding="utf-8")
 
-    def load_model_params(self) -> Dict[str, Any]:
+    def load_config(self, name: str) -> ModelConfig:
         """
-        Loads the model parameters from "params.yml" file.
+        Loads the named chat model configuration from "params.yml" file.
         """
         path = Path(self.settings.system_path) / "params.yml"
 
         if not path.exists():
-            raise RuntimeError(f"Model params file not found: {path}")
+            raise RuntimeError(f"Params file not found: {path}")
 
-        raw = path.read_text(encoding="utf-8")
-        data = yaml.safe_load(raw)
+        text = path.read_text(encoding="utf-8")
+        data = yaml.safe_load(text)
 
         if not isinstance(data, dict):
-            raise RuntimeError("Model params file must contain a YAML object at the top level.")
+            raise RuntimeError("Invalid params file format.")
 
-        return data
+        config = data.get(name)
+
+        if not isinstance(config, dict):
+            raise RuntimeError(f"Config not found: {name}")
+
+        model_config = ModelConfig(**config)
+
+        if not model_config.is_valid():
+            raise RuntimeError(f"Invalid model config: {name}")
+
+        return model_config
 
 
 class OpenAIClient(ProviderClient):
-    name = "openai"
-
     def __init__(self, parent: "ModelClient") -> None:
         super().__init__(parent)
+
+        if not self.parent.settings.openai_api_key:
+            raise RuntimeError("OpenAI API key is not configured.")
+
         self.client = openai.OpenAI(api_key=self.parent.settings.openai_api_key)
 
     def close(self) -> None:
@@ -213,25 +240,26 @@ class OpenAIClient(ProviderClient):
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
     ) -> str:
-        params = self.parent.load_model_params()
+        config = self.parent.load_config(self.parent.config_name)
 
         messages = [
             {"role": msg.role.value, "content": msg.content}
             for msg in context
         ]
-        params["messages"] = messages
+        config.params["messages"] = messages
+        config.params["model"] = config.model
 
         if response_format:
-            params["response_format"] = response_format
+            config.params["response_format"] = response_format
 
-        completion = self.client.chat.completions.parse(**params)
+        completion = self.client.chat.completions.parse(**config.params)
 
         if not completion.choices:
             raise RuntimeError("No response.")
 
         output = completion.choices[0].message.content or ""
 
-        params_log = dict(params)
+        params_log = dict(config.params)
         params_log.pop("messages", None)
         logger.info(
             "OpenAI call model=%s params=%s usage=%s",
@@ -244,10 +272,12 @@ class OpenAIClient(ProviderClient):
 
 
 class GeminiClient(ProviderClient):
-    name = "gemini"
-
     def __init__(self, parent: "ModelClient") -> None:
         super().__init__(parent)
+
+        if not self.parent.settings.gemini_api_key:
+            raise RuntimeError("Gemini API key is not configured.")
+
         self.client = genai.Client(api_key=self.parent.settings.gemini_api_key)
 
     def close(self) -> None:
@@ -288,21 +318,20 @@ class GeminiClient(ProviderClient):
             raise ValueError("Last message in context should be from user")
 
         curr_message = last.parts[0].text
-        params = self.parent.load_model_params()
-        model = params.pop("model", "")
+        config = self.parent.load_config(self.parent.config_name)
 
         if response_format:
-            params["responseMimeType"] = "application/json"
-            params["responseJsonSchema"] = response_format.model_json_schema()
+            config.params["responseMimeType"] = "application/json"
+            config.params["responseJsonSchema"] = response_format.model_json_schema()
 
-        config = GenerateContentConfig(
+        generate_config = GenerateContentConfig(
             system_instruction=system_prompt,
-            **params,
+            **config.params,
         )
         chat = self.client.chats.create(
-            model=model,
+            model=config.model,
             history=history,
-            config=config,
+            config=generate_config,
         )
 
         response = chat.send_message(curr_message)
@@ -311,7 +340,7 @@ class GeminiClient(ProviderClient):
         logger.info(
             "Gemini call model=%s params=%s usage=%s",
             getattr(response, "model_version", None),
-            params,
+            config.params,
             getattr(response, "usage_metadata", None),
         )
 
@@ -319,10 +348,12 @@ class GeminiClient(ProviderClient):
 
 
 class OllamaClient(ProviderClient):
-    name = "ollama"
-
     def __init__(self, parent: "ModelClient") -> None:
         super().__init__(parent)
+
+        if not self.parent.settings.ollama_host:
+            raise RuntimeError("Ollama host is not configured.")
+
         headers = {}
 
         if self.parent.settings.ollama_api_key:
@@ -338,24 +369,22 @@ class OllamaClient(ProviderClient):
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
     ) -> str:
-        params = self.parent.load_model_params()
-
-        model = params.pop("model", "")
+        config = self.parent.load_config(self.parent.config_name)
         messages = [
             {"role": msg.role.value, "content": msg.content}
             for msg in context
         ]
 
         if response_format:
-            params["format"] = response_format.model_json_schema()
+            config.params["format"] = response_format.model_json_schema()
 
-        response = self.client.chat(model=model, messages=messages, **params)
+        response = self.client.chat(model=config.model, messages=messages, **config.params)
         output = response.message.content
 
         if not output:
             raise RuntimeError("No response.")
 
-        params_log = dict(params)
+        params_log = dict(config.params)
         usage = {
             "total_duration": response.total_duration / 1e9,
             "load_duration": response.load_duration / 1e9,
@@ -367,7 +396,7 @@ class OllamaClient(ProviderClient):
 
         logger.info(
             "Ollama call model=%s params=%s usage=%s",
-            model,
+            config.model,
             params_log,
             usage,
         )
@@ -392,7 +421,7 @@ if __name__ == "__main__":
     ]
     response_format = CalendarEvent
 
-    client = ModelClient()
+    client = ModelClient("chat")
     output = asyncio.run(
         client.chat(
             system_prompt,

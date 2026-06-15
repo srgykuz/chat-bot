@@ -15,7 +15,7 @@ settings = get_settings()
 queue = get_queue()
 telegram_client = TelegramClient()
 session_client = SessionClient()
-model_client = ModelClient()
+model_client = ModelClient("chat")
 
 
 async def aclose() -> None:
