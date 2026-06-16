@@ -26,9 +26,9 @@ class Settings(BaseSettings):
         description="Use long polling to receive updates instead of expecting webhook endpoint call.",
     )
 
-    gemini_api_key: str = Field(
+    google_api_key: str = Field(
         default="",
-        description="Google Gemini API key.",
+        description="Google API key.",
     )
     openai_api_key: str = Field(
         default="",

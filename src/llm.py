@@ -102,8 +102,8 @@ class ModelClient:
         if config.provider == "openai":
             return OpenAIClient(self)
 
-        if config.provider == "gemini":
-            return GeminiClient(self)
+        if config.provider == "google":
+            return GoogleClient(self)
 
         if config.provider == "ollama":
             return OllamaClient(self)
@@ -271,14 +271,14 @@ class OpenAIClient(ProviderClient):
         return output
 
 
-class GeminiClient(ProviderClient):
+class GoogleClient(ProviderClient):
     def __init__(self, parent: "ModelClient") -> None:
         super().__init__(parent)
 
-        if not self.parent.settings.gemini_api_key:
-            raise RuntimeError("Gemini API key is not configured.")
+        if not self.parent.settings.google_api_key:
+            raise RuntimeError("Google API key is not configured.")
 
-        self.client = genai.Client(api_key=self.parent.settings.gemini_api_key)
+        self.client = genai.Client(api_key=self.parent.settings.google_api_key)
 
     def close(self) -> None:
         self.client.close()
@@ -338,7 +338,7 @@ class GeminiClient(ProviderClient):
         output = response.text or ""
 
         logger.info(
-            "Gemini call model=%s params=%s usage=%s",
+            "Google call model=%s params=%s usage=%s",
             getattr(response, "model_version", None),
             config.params,
             getattr(response, "usage_metadata", None),
