@@ -44,6 +44,24 @@ class ProviderClient(ABC):
         pass
 
     @abstractmethod
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
+        """
+        Generates a response for a single-turn prompt.
+
+        The prompt consist of a system instruction and a single user message
+        the model should respond to.
+
+        Output is a generated assistant message text. If response_format is provided,
+        output is a JSON string.
+        """
+        pass
+
+    @abstractmethod
     def chat(
         self,
         context: List[Message],
@@ -110,6 +128,34 @@ class ModelClient:
 
         raise ValueError(f"Unsupported provider: {config.provider}")
 
+    async def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
+        """
+        Takes pre-built prompts, calls LLM API and returns generated response.
+
+        system_prompt is a system instructions, user_prompt is a user request the
+        model should respond to.
+
+        Returns model response as a plain string. If response_format is provided,
+        returns JSON string which you should parse and validate using Pydantic's model_validate_json().
+        """
+        if not user_prompt:
+            raise RuntimeError("User prompt is required.")
+
+        output = await asyncio.to_thread(
+            self.provider.generate,
+            system_prompt,
+            user_prompt,
+            response_format,
+        )
+        output = output.strip()
+
+        return output
+
     async def chat(
         self,
         system_prompt: str,
@@ -117,7 +163,8 @@ class ModelClient:
         response_format: Optional[type[BaseModel]] = None,
     ) -> str:
         """
-        Builds full chat context, calls LLM API and returns generated response.
+        Builds full chat context, calls LLM API and returns generated response
+        to the last user messages.
 
         system_prompt should be created using build_system_prompt(). Create it
         for every new chat() call.
@@ -235,6 +282,39 @@ class OpenAIClient(ProviderClient):
     def close(self) -> None:
         self.client.close()
 
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
+        config = self.parent.load_config(self.parent.config_name)
+        params = dict(config.params)
+
+        params["model"] = config.model
+        params["instructions"] = system_prompt
+        params["input"] = user_prompt
+
+        if response_format:
+            params["text_format"] = response_format
+
+        response = self.client.responses.parse(**params)
+        output = response.output_text or ""
+
+        if not output:
+            raise RuntimeError("No response.")
+
+        params_log = dict(params)
+        params_log.pop("input", None)
+        logger.info(
+            "OpenAI generate: model=%s params=%s usage=%s",
+            getattr(response, "model", None),
+            params_log,
+            getattr(response, "usage", None),
+        )
+
+        return output
+
     def chat(
         self,
         context: List[Message],
@@ -262,7 +342,7 @@ class OpenAIClient(ProviderClient):
         params_log = dict(config.params)
         params_log.pop("messages", None)
         logger.info(
-            "OpenAI call model=%s params=%s usage=%s",
+            "OpenAI chat: model=%s params=%s usage=%s",
             getattr(completion, "model", None),
             params_log,
             getattr(completion, "usage", None),
@@ -282,6 +362,39 @@ class GoogleClient(ProviderClient):
 
     def close(self) -> None:
         self.client.close()
+
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
+        config = self.parent.load_config(self.parent.config_name)
+        params = dict(config.params)
+
+        if response_format:
+            params["responseMimeType"] = "application/json"
+            params["responseJsonSchema"] = response_format.model_json_schema()
+
+        generate_config = GenerateContentConfig(
+            system_instruction=system_prompt,
+            **params,
+        )
+        response = self.client.models.generate_content(
+            model=config.model,
+            contents=user_prompt,
+            config=generate_config,
+        )
+        output = response.text or ""
+
+        logger.info(
+            "Google generate: model=%s params=%s usage=%s",
+            getattr(response, "model_version", None),
+            params,
+            getattr(response, "usage_metadata", None),
+        )
+
+        return output
 
     def chat(
         self,
@@ -338,7 +451,7 @@ class GoogleClient(ProviderClient):
         output = response.text or ""
 
         logger.info(
-            "Google call model=%s params=%s usage=%s",
+            "Google chat: model=%s params=%s usage=%s",
             getattr(response, "model_version", None),
             config.params,
             getattr(response, "usage_metadata", None),
@@ -363,6 +476,47 @@ class OllamaClient(ProviderClient):
 
     def close(self) -> None:
         self.client.close()
+
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> str:
+        config = self.parent.load_config(self.parent.config_name)
+        params = dict(config.params)
+
+        if response_format:
+            params["format"] = response_format.model_json_schema()
+
+        response = self.client.generate(
+            model=config.model,
+            prompt=user_prompt,
+            system=system_prompt,
+            **params,
+        )
+        output = response.response
+
+        if not output:
+            raise RuntimeError("No response.")
+
+        usage = {
+            "total_duration": response.total_duration / 1e9,
+            "load_duration": response.load_duration / 1e9,
+            "prompt_eval_count": response.prompt_eval_count,
+            "prompt_eval_duration": response.prompt_eval_duration / 1e9,
+            "eval_count": response.eval_count,
+            "eval_duration": response.eval_duration / 1e9,
+        }
+
+        logger.info(
+            "Ollama generate: model=%s params=%s usage=%s",
+            config.model,
+            params,
+            usage,
+        )
+
+        return output
 
     def chat(
         self,
@@ -395,7 +549,7 @@ class OllamaClient(ProviderClient):
         }
 
         logger.info(
-            "Ollama call model=%s params=%s usage=%s",
+            "Ollama chat: model=%s params=%s usage=%s",
             config.model,
             params_log,
             usage,
