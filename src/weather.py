@@ -100,7 +100,7 @@ async def fetch_weather(city: str, lang: str = "", use_cache: bool = True) -> We
     )
 
     if use_cache:
-        data = json.dumps(info.to_dict())
+        data = json.dumps(info.to_dict(), ensure_ascii=False)
 
         redis.setex(
             cache_key,

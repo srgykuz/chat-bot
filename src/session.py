@@ -298,7 +298,7 @@ class SessionClient:
         The conversation history is trimmed to the maximum length defined in the settings.
         """
         key = self._history_key(chat_id)
-        value = json.dumps(message.to_dict())
+        value = json.dumps(message.to_dict(), ensure_ascii=False)
         pipe = self.redis.pipeline()
 
         pipe.rpush(key, value)
@@ -328,7 +328,7 @@ class SessionClient:
         Returns new flush token which you should pass in flush_buffered_messages() to
         pop all buffered messages.
         """
-        payload = json.dumps(message.to_dict())
+        payload = json.dumps(message.to_dict(), ensure_ascii=False)
         pipe = self.redis.pipeline()
 
         pipe.rpush(self._messages_pending_key(chat_id), payload)
