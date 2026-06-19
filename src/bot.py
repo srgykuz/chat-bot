@@ -8,6 +8,7 @@ from src.session import Message, MessageRole, SessionClient, Persona, User
 from src.weather import fetch_weather, WeatherInfo
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_settings, get_queue
+from src import analytics
 
 
 logger = logging.getLogger(__name__)
@@ -150,7 +151,9 @@ async def handle_message(message: TelegramMessage) -> None:
         return
 
     token = session_client.buffer_message(chat_id, message)
+
     enqueue_flush_buffered_messages(chat_id, token)
+    enqueue_analytics(chat_id)
 
     logger.info(
         "Buffered update %s from %s for chat %s",
@@ -265,3 +268,30 @@ def flush_buffered_messages(chat_id: int, token: str) -> None:
         return
 
     asyncio.run(handle_buffered_messages(chat_id, batch))
+
+
+def enqueue_analytics(chat_id: int) -> None:
+    """
+    Enqueues all analytics functions.
+    """
+    if session_client.lock_analytics(
+        chat_id,
+        "analyze_chat_30s",
+        analytics.analyze_chat_30s_timedelta,
+    ):
+        queue.enqueue_in(
+            analytics.analyze_chat_30s_timedelta,
+            analytics.analyze_chat_30s,
+            chat_id,
+        )
+
+    if session_client.lock_analytics(
+        chat_id,
+        "analyze_chat_2m",
+        analytics.analyze_chat_2m_timedelta,
+    ):
+        queue.enqueue_in(
+            analytics.analyze_chat_2m_timedelta,
+            analytics.analyze_chat_2m,
+            chat_id,
+        )

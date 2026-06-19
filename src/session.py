@@ -1,6 +1,7 @@
 import json
 import random
 import time
+from datetime import timedelta
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any, cast
@@ -11,6 +12,7 @@ from redis import Redis, WatchError
 
 from src.config import get_settings
 from src.telegram import TelegramMessage
+from src.schema import EmotionalState, Facts
 
 
 class MessageRole(StrEnum):
@@ -109,6 +111,9 @@ class SessionClient:
         pipe.delete(self._messages_pending_key(chat_id))
         pipe.delete(self._messages_token_key(chat_id))
         pipe.delete(self._messages_processing_key(chat_id))
+        pipe.delete(self._facts_key(chat_id))
+        pipe.delete(self._emotional_states_key(chat_id))
+        pipe.delete(self._emotional_state_key(chat_id))
 
         pipe.execute()
 
@@ -141,6 +146,30 @@ class SessionClient:
         Returns the Redis key for storing messages that are currently being processed for a specific chat.
         """
         return f"session:{chat_id}:messages_processing"
+
+    def _analytics_lock_key(self, chat_id: int, name: str) -> str:
+        """
+        Returns the Redis key for storing analytics lock for a specific chat and analytics function.
+        """
+        return f"session:{chat_id}:analytics_lock:{name}"
+
+    def _facts_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing the latest facts analysis for a specific chat.
+        """
+        return f"session:{chat_id}:facts"
+
+    def _emotional_states_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing emotional state analysis for a specific chat.
+        """
+        return f"session:{chat_id}:emotional_states"
+
+    def _emotional_state_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing the current emotional state of a specific chat.
+        """
+        return f"session:{chat_id}:emotional_state"
 
     def load_personas(self) -> List[Persona]:
         """
@@ -404,3 +433,93 @@ class SessionClient:
             messages.append(message)
 
         return messages
+
+    def lock_analytics(self, chat_id: int, name: str, expire: timedelta) -> bool:
+        """
+        Sets a lock for analytics function with the given name and chat ID,
+        which will expire after the specified time.
+
+        If lock does not exists, returns True and sets the lock which will be
+        automatically released after the expiration time. If lock already exists,
+        returns False.
+        """
+        key = self._analytics_lock_key(chat_id, name)
+
+        if self.redis.exists(key):
+            return False
+
+        self.redis.set(key, 1, ex=expire)
+
+        return True
+
+    def set_facts(self, chat_id: int, facts: Facts) -> None:
+        """
+        Sets the facts analysis for the given chat ID.
+        """
+        key = self._facts_key(chat_id)
+        value = facts.dumps()
+
+        self.redis.set(key, value)
+
+    def get_facts(self, chat_id: int) -> Optional[Facts]:
+        """
+        Returns the facts analysis for the given chat ID, or None if not set.
+        """
+        key = self._facts_key(chat_id)
+        value = cast(Optional[str], self.redis.get(key))
+
+        if value:
+            return Facts.loads(value)
+
+        return None
+
+    def append_emotional_states(self, chat_id: int, state: EmotionalState, limit: int) -> None:
+        """
+        Appends a new emotional state and keeps last N items.
+        """
+        key = self._emotional_states_key(chat_id)
+        value = state.dumps()
+        pipe = self.redis.pipeline()
+
+        pipe.rpush(key, value)
+        pipe.ltrim(key, -limit, -1)
+
+        pipe.execute()
+
+    def get_emotional_states(self, chat_id: int) -> list[EmotionalState]:
+        """
+        Returns the stored emotional states for the given chat ID.
+        """
+        key = self._emotional_states_key(chat_id)
+        items = cast(List[str], self.redis.lrange(key, 0, -1))
+        states: list[EmotionalState] = []
+
+        for item in items:
+            if not item:
+                continue
+
+            state = EmotionalState.loads(item)
+            states.append(state)
+
+        return states
+
+    def set_emotional_state(self, chat_id: int, state: EmotionalState, expire: Optional[timedelta] = None) -> None:
+        """
+        Stores the current emotional state for the given chat ID.
+        """
+        key = self._emotional_state_key(chat_id)
+        value = state.dumps()
+
+        self.redis.set(key, value, ex=expire)
+
+    def get_emotional_state(self, chat_id: int) -> Optional[EmotionalState]:
+        """
+        Returns the current emotional state for the given chat ID, or None if not set.
+        """
+        key = self._emotional_state_key(chat_id)
+        value = cast(Optional[str], self.redis.get(key))
+
+        if value:
+            return EmotionalState.loads(value)
+
+        return None

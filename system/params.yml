@@ -7,3 +7,6 @@ chat:
     top_p: 0.9
     presence_penalty: 0.2
     frequency_penalty: 0.2
+analytics:
+  provider: google
+  model: gemini-3.1-flash-lite
