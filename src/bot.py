@@ -192,6 +192,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         first_name=messages[-1].first_name,
         last_name=messages[-1].last_name,
     )
+    user_facts = session_client.get_facts(chat_id)
     persona_weather: Optional[WeatherInfo] = None
 
     try:
@@ -199,7 +200,12 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
     except Exception as e:
         logger.error(f"Error fetching weather info: {e}")
 
-    system_prompt = model_client.build_system_prompt(persona, user, persona_weather)
+    system_prompt = model_client.build_system_prompt(
+        persona,
+        user,
+        persona_weather=persona_weather,
+        user_facts=user_facts,
+    )
     response = ""
     success = False
 

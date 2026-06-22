@@ -57,3 +57,11 @@ Assistant: и че делать будешь?
 {% if user.first_name %}
 Имя собеседника: {{ user.first_name }} {{ user.last_name | default("", true) }}
 {% endif %}
+
+{% if user_facts and user_facts.facts %}
+[USER FACTS]
+Факты о пользователе полученные из прошлых сообщений:
+{% for fact in user_facts.facts %}
+- {{ fact.tag }}: {{ fact.value }}
+{% endfor %}
+{% endif %}
