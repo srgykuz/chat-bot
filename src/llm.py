@@ -18,7 +18,7 @@ import yaml
 from src.config import get_settings
 from src.session import Message, MessageRole, Persona, User
 from src.weather import WeatherInfo
-from src.schema import Facts
+from src.schema import Facts, EmotionalState
 
 
 logger = logging.getLogger(__name__)
@@ -198,6 +198,7 @@ class ModelClient:
         user: User,
         persona_weather: Optional[WeatherInfo] = None,
         user_facts: Optional[Facts] = None,
+        user_emotional_state: Optional[EmotionalState] = None,
     ) -> str:
         """
         Creates a system prompt by loading the template and filling all the
@@ -222,6 +223,7 @@ class ModelClient:
             "persona": persona,
             "user": user,
             "user_facts": user_facts,
+            "user_emotional_state": user_emotional_state,
             "persona_now": persona_now,
             "persona_weekday": persona_weekday,
             "persona_weather": persona_weather,

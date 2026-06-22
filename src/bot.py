@@ -193,6 +193,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         last_name=messages[-1].last_name,
     )
     user_facts = session_client.get_facts(chat_id)
+    user_emotional_state = session_client.get_emotional_state(chat_id)
     persona_weather: Optional[WeatherInfo] = None
 
     try:
@@ -205,6 +206,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         user,
         persona_weather=persona_weather,
         user_facts=user_facts,
+        user_emotional_state=user_emotional_state,
     )
     response = ""
     success = False
