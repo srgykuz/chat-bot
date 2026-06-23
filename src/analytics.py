@@ -7,7 +7,7 @@ import statistics
 from src.config import get_settings
 from src.session import SessionClient, Message
 from src.llm import ModelClient
-from src.schema import EmotionalState, EmotionalStateLLM, Facts
+from src.schema import EmotionalState, EmotionalStateLLM, Facts, ConversationSummary, ConversationSummaryLLM
 
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,7 @@ model_client = ModelClient("analytics")
 
 analyze_chat_30s_timedelta = timedelta(seconds=30)
 analyze_chat_2m_timedelta = timedelta(minutes=2)
+analyze_chat_5m_timedelta = timedelta(minutes=5)
 
 
 def close() -> None:
@@ -57,6 +58,22 @@ def analyze_chat_2m(chat_id: int) -> None:
         return
 
     infer_facts(chat_id, history)
+
+
+def analyze_chat_5m(chat_id: int) -> None:
+    """
+    Executes set of chat analyzers.
+
+    This function intended to be executed in 5 minutes since a user's message.
+    Only one instance of this function should be scheduled at a moment.
+    """
+    history = session_client.get_history(chat_id)
+
+    if len(history) < 10:
+        logger.info("Skipping due to short history")
+        return
+
+    infer_conversation_summary(chat_id, history)
 
 
 def history_to_conversation(history: list[Message]) -> str:
@@ -151,3 +168,52 @@ def infer_facts(chat_id: int, history: list[Message]) -> None:
     new_facts.facts = new_facts.facts[:settings.facts_limit]
 
     session_client.set_facts(chat_id, new_facts)
+
+
+def infer_conversation_summary(chat_id: int, history: list[Message]) -> None:
+    """
+    Summarizes the conversation into multiple summaries and updates the storage.
+    """
+    known_summary = session_client.get_conversation_summary(chat_id)
+    known_summary_llm = known_summary.to_llm() if known_summary else None
+    known_summary_s = known_summary_llm.dumps() if known_summary_llm else ""
+
+    system_prompt = (
+        "You are a backend analysis engine. Your task is to review the provided "
+        "conversation history between user and assistant and summarize the conversation "
+        "into one or more summaries that are worth to remember or that add new information "
+        "to already known summaries. One topic per one summary. You will receive a list of "
+        "already known summaries. Do not repeat summaries that are already known, even if "
+        "they are phrased differently. Treat summaries as duplicates if they refer to the "
+        "same underlying meaning, even with different wording, spelling, language, or granularity. "
+        "If a new summary is partially overlapping with an existing summary, return it only if it adds "
+        "materially new information. Output values in the user's language. Use assistant messages "
+        "only for context. Output your evaluation strictly matching the requested JSON schema. "
+        "Return an empty result if there is nothing useful to remember or if the conversation does not "
+        "have at least one clear topic."
+        "\n\n"
+        f"Known summaries: {known_summary_s}"
+    )
+    user_prompt = history_to_conversation(history)
+
+    result = asyncio.run(model_client.generate(
+        system_prompt,
+        user_prompt,
+        response_format=ConversationSummaryLLM,
+    ))
+
+    now = time()
+    new_summary_llm = ConversationSummaryLLM.loads(result)
+    new_summary = ConversationSummary(
+        summaries=new_summary_llm.summaries,
+        timestamps=[now for _ in new_summary_llm.summaries]
+    )
+
+    if known_summary:
+        new_summary.summaries.extend(known_summary.summaries)
+        new_summary.timestamps.extend(known_summary.timestamps)
+
+    new_summary.summaries = new_summary.summaries[:settings.summaries_limit]
+    new_summary.timestamps = new_summary.timestamps[:settings.summaries_limit]
+
+    session_client.set_conversation_summary(chat_id, new_summary)

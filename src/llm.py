@@ -18,7 +18,7 @@ import yaml
 from src.config import get_settings
 from src.session import Message, MessageRole, Persona, User
 from src.weather import WeatherInfo
-from src.schema import Facts, EmotionalState
+from src.schema import Facts, EmotionalState, ConversationSummary
 
 
 logger = logging.getLogger(__name__)
@@ -199,6 +199,7 @@ class ModelClient:
         persona_weather: Optional[WeatherInfo] = None,
         user_facts: Optional[Facts] = None,
         user_emotional_state: Optional[EmotionalState] = None,
+        conversation_summary: Optional[ConversationSummary] = None,
     ) -> str:
         """
         Creates a system prompt by loading the template and filling all the
@@ -227,6 +228,7 @@ class ModelClient:
             "persona_now": persona_now,
             "persona_weekday": persona_weekday,
             "persona_weather": persona_weather,
+            "conversation_summary": conversation_summary,
         }
 
         persona_prompt = jinja.from_string(persona.prompt).render(context)

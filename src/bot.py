@@ -194,6 +194,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
     )
     user_facts = session_client.get_facts(chat_id)
     user_emotional_state = session_client.get_emotional_state(chat_id)
+    conversation_summary = session_client.get_conversation_summary(chat_id)
     persona_weather: Optional[WeatherInfo] = None
 
     try:
@@ -207,6 +208,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         persona_weather=persona_weather,
         user_facts=user_facts,
         user_emotional_state=user_emotional_state,
+        conversation_summary=conversation_summary,
     )
     response = ""
     success = False
@@ -301,5 +303,16 @@ def enqueue_analytics(chat_id: int) -> None:
         queue.enqueue_in(
             analytics.analyze_chat_2m_timedelta,
             analytics.analyze_chat_2m,
+            chat_id,
+        )
+
+    if session_client.lock_analytics(
+        chat_id,
+        "analyze_chat_5m",
+        analytics.analyze_chat_5m_timedelta,
+    ):
+        queue.enqueue_in(
+            analytics.analyze_chat_5m_timedelta,
+            analytics.analyze_chat_5m,
             chat_id,
         )

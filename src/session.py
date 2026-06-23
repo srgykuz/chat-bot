@@ -12,7 +12,7 @@ from redis import Redis, WatchError
 
 from src.config import get_settings
 from src.telegram import TelegramMessage
-from src.schema import EmotionalState, Facts
+from src.schema import EmotionalState, Facts, ConversationSummary
 
 
 class MessageRole(StrEnum):
@@ -114,6 +114,7 @@ class SessionClient:
         pipe.delete(self._facts_key(chat_id))
         pipe.delete(self._emotional_states_key(chat_id))
         pipe.delete(self._emotional_state_key(chat_id))
+        pipe.delete(self._conversation_summary_key(chat_id))
 
         pipe.execute()
 
@@ -170,6 +171,12 @@ class SessionClient:
         Returns the Redis key for storing the current emotional state of a specific chat.
         """
         return f"session:{chat_id}:emotional_state"
+
+    def _conversation_summary_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing conversation summaries for a specific chat.
+        """
+        return f"session:{chat_id}:conversation_summary"
 
     def load_personas(self) -> List[Persona]:
         """
@@ -521,5 +528,26 @@ class SessionClient:
 
         if value:
             return EmotionalState.loads(value)
+
+        return None
+
+    def set_conversation_summary(self, chat_id: int, summary: ConversationSummary) -> None:
+        """
+        Sets the conversation summary analysis for the given chat ID.
+        """
+        key = self._conversation_summary_key(chat_id)
+        value = summary.dumps()
+
+        self.redis.set(key, value)
+
+    def get_conversation_summary(self, chat_id: int) -> Optional[ConversationSummary]:
+        """
+        Returns the conversation summary analysis for the given chat ID, or None if not set.
+        """
+        key = self._conversation_summary_key(chat_id)
+        value = cast(Optional[str], self.redis.get(key))
+
+        if value:
+            return ConversationSummary.loads(value)
 
         return None

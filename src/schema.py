@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Self
+from typing import Self, Optional
 from time import time
 
 from pydantic import BaseModel, Field
@@ -67,3 +67,14 @@ class Fact(BaseModel):
 
 class Facts(BaseModelJSON):
     facts: list[Fact]
+
+
+class ConversationSummaryLLM(BaseModelJSON):
+    summaries: list[str]
+
+
+class ConversationSummary(ConversationSummaryLLM):
+    timestamps: list[float]
+
+    def to_llm(self) -> ConversationSummaryLLM:
+        return ConversationSummaryLLM.model_validate(self.model_dump())

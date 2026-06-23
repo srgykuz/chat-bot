@@ -72,7 +72,11 @@ class Settings(BaseSettings):
     )
     facts_limit: int = Field(
         default=50,
-        description="Maximum number of recent facts to keep in chat history per user."
+        description="Maximum number of recent facts to keep in chat history per user.",
+    )
+    summaries_limit: int = Field(
+        default=25,
+        description="Maximum number of recent summaries to keep in chat history per user.",
     )
     chat_flush_interval: int = Field(
         default=5,
