@@ -1,3 +1,4 @@
+import io
 import asyncio
 from dataclasses import dataclass, asdict
 import logging
@@ -126,6 +127,7 @@ class TelegramClient:
         http_method: str,
         api_method: str,
         payload: Dict[str, Any] | None = None,
+        files: Dict[str, Any] | None = None,
         timeout: float = 10.0,
     ) -> Dict[str, Any]:
         """
@@ -136,8 +138,13 @@ class TelegramClient:
             "timeout": timeout,
         }
 
-        if payload is not None:
+        if files is not None:
+            request_kwargs["data"] = payload
+        elif payload is not None:
             request_kwargs["json"] = payload
+
+        if files is not None:
+            request_kwargs["files"] = files
 
         try:
             response = await self.client.request(http_method, url, **request_kwargs)
@@ -189,6 +196,34 @@ class TelegramClient:
             payload["reply_to_message_id"] = reply_to_message_id
 
         return await self._request_json("POST", "sendMessage", payload=payload)
+
+    async def send_document(
+        self,
+        chat_id: int,
+        content: str,
+        filename: str = "document.txt",
+        reply_to_message_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Send a document (file) to a Telegram chat.
+
+        content is a plain text data of the file, filename is name of the file.
+        """
+        payload = {
+            "chat_id": chat_id,
+        }
+
+        if reply_to_message_id:
+            payload["reply_to_message_id"] = reply_to_message_id
+
+        document = io.BytesIO(content.encode("utf-8"))
+        document.name = filename
+
+        files = {
+            "document": (filename, document, "text/plain; charset=utf-8"),
+        }
+
+        return await self._request_json("POST", "sendDocument", payload=payload, files=files)
 
     async def send_chat_action(self, chat_id: int, action: str = "typing") -> Dict[str, Any]:
         """

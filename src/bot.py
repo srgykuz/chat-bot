@@ -1,6 +1,7 @@
 import logging
 import asyncio
 from typing import Dict, Any, Optional
+from time import time
 from datetime import timedelta
 
 from src.llm import ModelClient
@@ -52,9 +53,11 @@ async def handle_command(message: TelegramMessage) -> None:
     """
     chat_id = message.chat_id or 0
     text = (message.text or "").strip()
-
     command = text.split()[0].lower()
+
     response = ""
+    file_content = ""
+    file_name = ""
 
     if command == "/get_persona":
         persona = session_client.get_persona(chat_id)
@@ -106,6 +109,9 @@ async def handle_command(message: TelegramMessage) -> None:
     elif command == "/clear":
         session_client.clear(chat_id)
         response = "Session cleared."
+    elif command == "/get_prompt":
+        file_content = await build_system_prompt(chat_id, message)
+        file_name = f"prompt-{int(time())}.txt"
     else:
         response = (
             "Persona commands:\n"
@@ -113,19 +119,28 @@ async def handle_command(message: TelegramMessage) -> None:
             "/get\\_persona\n"
             "/list\\_persona\n"
             "\n"
-            "History commands:\n"
+            "Prompt commands:\n"
+            "/get\\_prompt\n"
             "/get\\_history\n"
             "\n"
             "Other commands:\n"
             "/clear"
         )
 
-    await telegram_client.send_message(
-        chat_id=chat_id,
-        text=response,
-        reply_to_message_id=message.message_id,
-        escape=False
-    )
+    if response:
+        await telegram_client.send_message(
+            chat_id=chat_id,
+            text=response,
+            reply_to_message_id=message.message_id,
+            escape=False
+        )
+    elif file_content:
+        await telegram_client.send_document(
+            chat_id=chat_id,
+            content=file_content,
+            filename=file_name,
+            reply_to_message_id=message.message_id,
+        )
 
 
 async def handle_message(message: TelegramMessage) -> None:
@@ -179,29 +194,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
     for text in input:
         history.append(Message(role=MessageRole.USER, content=text))
 
-    persona = session_client.init_persona(chat_id)
-    user = User(
-        first_name=messages[-1].first_name,
-        last_name=messages[-1].last_name,
-    )
-    user_facts = session_client.get_facts(chat_id)
-    user_emotional_state = session_client.get_emotional_state(chat_id)
-    conversation_summary = session_client.get_conversation_summary(chat_id)
-    persona_weather: Optional[WeatherInfo] = None
-
-    try:
-        persona_weather = await fetch_weather(persona.city, lang="ru")
-    except Exception as e:
-        logger.error(f"Error fetching weather info: {e}")
-
-    system_prompt = model_client.build_system_prompt(
-        persona,
-        user,
-        persona_weather=persona_weather,
-        user_facts=user_facts,
-        user_emotional_state=user_emotional_state,
-        conversation_summary=conversation_summary,
-    )
+    system_prompt = await build_system_prompt(chat_id, messages[-1])
     response = ""
     success = False
 
@@ -232,6 +225,37 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         await asyncio.sleep(delay)
 
         await telegram_client.send_message(chat_id=chat_id, text=text)
+
+
+async def build_system_prompt(chat_id: int, msg: TelegramMessage) -> str:
+    """
+    Builds system prompt for chat LLM call.
+    """
+    user = User(
+        first_name=msg.first_name,
+        last_name=msg.last_name,
+    )
+    persona = session_client.init_persona(chat_id)
+    user_facts = session_client.get_facts(chat_id)
+    user_emotional_state = session_client.get_emotional_state(chat_id)
+    conversation_summary = session_client.get_conversation_summary(chat_id)
+    persona_weather: Optional[WeatherInfo] = None
+
+    try:
+        persona_weather = await fetch_weather(persona.city, lang="ru")
+    except Exception as e:
+        logger.error(f"Error fetching weather info: {e}")
+
+    system_prompt = model_client.build_system_prompt(
+        persona,
+        user,
+        persona_weather=persona_weather,
+        user_facts=user_facts,
+        user_emotional_state=user_emotional_state,
+        conversation_summary=conversation_summary,
+    )
+
+    return system_prompt
 
 
 def calc_typing_duration(text: str) -> float:
