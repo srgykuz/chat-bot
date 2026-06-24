@@ -15,8 +15,8 @@ settings = get_settings()
 session_client = SessionClient()
 model_client = ModelClient("analytics")
 
-analyze_chat_30s_timedelta = timedelta(seconds=30)
-analyze_chat_2m_timedelta = timedelta(minutes=2)
+analyze_chat_1m_timedelta = timedelta(minutes=1)
+analyze_chat_3m_timedelta = timedelta(minutes=3)
 analyze_chat_5m_timedelta = timedelta(minutes=5)
 
 
@@ -28,11 +28,11 @@ def close() -> None:
     model_client.close()
 
 
-def analyze_chat_30s(chat_id: int) -> None:
+def analyze_chat_1m(chat_id: int) -> None:
     """
     Executes set of chat analyzers.
 
-    This function intended to be executed in 30 seconds since a user's message.
+    This function intended to be executed in 1 minute since a user's message.
     Only one instance of this function should be scheduled at a moment.
     """
     history = session_client.get_history(chat_id)
@@ -44,11 +44,11 @@ def analyze_chat_30s(chat_id: int) -> None:
     infer_emotional_state(chat_id, history)
 
 
-def analyze_chat_2m(chat_id: int) -> None:
+def analyze_chat_3m(chat_id: int) -> None:
     """
     Executes set of chat analyzers.
 
-    This function intended to be executed in 2 minutes since a user's message.
+    This function intended to be executed in 3 minutes since a user's message.
     Only one instance of this function should be scheduled at a moment.
     """
     history = session_client.get_history(chat_id)

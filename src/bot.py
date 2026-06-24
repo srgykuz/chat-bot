@@ -286,23 +286,23 @@ def enqueue_analytics(chat_id: int) -> None:
     """
     if session_client.lock_analytics(
         chat_id,
-        "analyze_chat_30s",
-        analytics.analyze_chat_30s_timedelta,
+        "analyze_chat_1m",
+        analytics.analyze_chat_1m_timedelta,
     ):
         queue.enqueue_in(
-            analytics.analyze_chat_30s_timedelta,
-            analytics.analyze_chat_30s,
+            analytics.analyze_chat_1m_timedelta,
+            analytics.analyze_chat_1m,
             chat_id,
         )
 
     if session_client.lock_analytics(
         chat_id,
-        "analyze_chat_2m",
-        analytics.analyze_chat_2m_timedelta,
+        "analyze_chat_3m",
+        analytics.analyze_chat_3m_timedelta,
     ):
         queue.enqueue_in(
-            analytics.analyze_chat_2m_timedelta,
-            analytics.analyze_chat_2m,
+            analytics.analyze_chat_3m_timedelta,
+            analytics.analyze_chat_3m,
             chat_id,
         )
 
