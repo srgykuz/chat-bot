@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Self, Optional
+from typing import Self
 from time import time
 
 from pydantic import BaseModel, Field
