@@ -95,7 +95,7 @@ def infer_emotional_state(chat_id: int, history: list[Message]) -> None:
         "only as context. Output a JSON object that strictly matches the requested "
         "schema. Set confidence fields to reflect how certain you are about each value."
     )
-    user_prompt = history_to_conversation(history[-5:])
+    user_prompt = history_to_conversation(history[-10:])
 
     result = asyncio.run(model_client.generate(
         system_prompt,
@@ -109,17 +109,17 @@ def infer_emotional_state(chat_id: int, history: list[Message]) -> None:
     states = session_client.get_emotional_states(chat_id)
     now = time()
     recency = timedelta(hours=1)
-    recent_states = [state for state in states if (now - state.timestamp) <= recency.total_seconds()]
+    recent_states = [s for s in states if (now - s.timestamp) <= recency.total_seconds()]
 
     if len(recent_states) < 3:
         return
 
-    mood = statistics.mode([state.mood for state in recent_states])
-    tone = statistics.mode([state.tone for state in recent_states])
-    engagement = statistics.mode([state.engagement for state in recent_states])
-    mood_confidence = statistics.mean([state.mood_confidence for state in recent_states if state.mood == mood])
-    tone_confidence = statistics.mean([state.tone_confidence for state in recent_states if state.tone == tone])
-    engagement_confidence = statistics.mean([state.engagement_confidence for state in recent_states if state.engagement == engagement])
+    mood = statistics.mode([s.mood for s in recent_states])
+    tone = statistics.mode([s.tone for s in recent_states])
+    engagement = statistics.mode([s.engagement for s in recent_states])
+    mood_confidence = statistics.mean([s.mood_confidence for s in recent_states if s.mood == mood])
+    tone_confidence = statistics.mean([s.tone_confidence for s in recent_states if s.tone == tone])
+    engagement_confidence = statistics.mean([s.engagement_confidence for s in recent_states if s.engagement == engagement])
 
     current_state = EmotionalState(
         mood=mood,
@@ -129,8 +129,9 @@ def infer_emotional_state(chat_id: int, history: list[Message]) -> None:
         tone_confidence=tone_confidence,
         engagement_confidence=engagement_confidence,
     )
+    expires = timedelta(hours=1)
 
-    session_client.set_emotional_state(chat_id, current_state, timedelta(hours=1))
+    session_client.set_emotional_state(chat_id, current_state, expires)
 
 
 def infer_facts(chat_id: int, history: list[Message]) -> None:
