@@ -67,9 +67,6 @@ async def handle_command(message: TelegramMessage) -> None:
             )
         else:
             response = "No persona is currently selected for this chat."
-    elif command == "/clear_persona":
-        session_client.clear(chat_id)
-        response = "Persona cleared. A new persona will be created on the next message."
     elif command == "/set_persona":
         parts = text.split(maxsplit=1)
 
@@ -106,9 +103,6 @@ async def handle_command(message: TelegramMessage) -> None:
             f"User messages: `{info.num_user_messages}`\n"
             f"Assistant messages: `{info.num_assistant_messages}`"
         )
-    elif command == "/clear_history":
-        session_client.clear(chat_id)
-        response = "Chat history cleared."
     elif command == "/clear":
         session_client.clear(chat_id)
         response = "Session cleared."
@@ -118,11 +112,9 @@ async def handle_command(message: TelegramMessage) -> None:
             "/set\\_persona <id>\n"
             "/get\\_persona\n"
             "/list\\_persona\n"
-            "/clear\\_persona\n"
             "\n"
             "History commands:\n"
             "/get\\_history\n"
-            "/clear\\_history\n"
             "\n"
             "Other commands:\n"
             "/clear"
