@@ -99,6 +99,8 @@ async def handle_command(message: TelegramMessage) -> None:
             response = "No personas available."
     elif command == "/get_history":
         info = session_client.get_history_info(chat_id)
+        history = session_client.get_history(chat_id)
+
         response = (
             "*Chat history info:*\n"
             f"Total messages: `{info.num_messages}`\n"
@@ -106,6 +108,13 @@ async def handle_command(message: TelegramMessage) -> None:
             f"User messages: `{info.num_user_messages}`\n"
             f"Assistant messages: `{info.num_assistant_messages}`"
         )
+
+        if history:
+            response += (
+                "\n"
+                f"Start: \"{history[0].content}\"\n"
+                f"End: \"{history[-1].content}\""
+            )
     elif command == "/clear":
         session_client.clear(chat_id)
         response = "Session cleared."
