@@ -158,9 +158,6 @@ class SessionClient:
                 prompt=prompt,
             )
 
-            if not persona.is_valid():
-                raise RuntimeError(f"Persona definition is invalid: {persona_dir}")
-
             personas.append(persona)
 
         if not personas:
@@ -250,8 +247,7 @@ class SessionClient:
             if not item:
                 continue
 
-            data = json.loads(item)
-            msg = Message.from_dict(data)
+            msg = Message.loads(item)
             history.append(msg)
 
         return history
@@ -262,7 +258,7 @@ class SessionClient:
         The conversation history is trimmed to the maximum length defined in the settings.
         """
         key = self._history_key(chat_id)
-        value = json.dumps(message.to_dict(), ensure_ascii=False)
+        value = message.dumps()
         pipe = self.redis.pipeline()
 
         pipe.rpush(key, value)
