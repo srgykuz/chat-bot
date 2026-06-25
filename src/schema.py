@@ -1,8 +1,78 @@
 from enum import StrEnum
-from typing import Self
+from typing import Self, Optional, Any
 from time import time
+from dataclasses import dataclass, asdict, field
 
 from pydantic import BaseModel, Field
+
+
+@dataclass(frozen=True, slots=True)
+class User:
+    """
+    Information about a user that we are talking to.
+    """
+    first_name: Optional[str]
+    last_name: Optional[str]
+
+
+@dataclass(frozen=True, slots=True)
+class Persona:
+    """
+    Information about a persona that we are mimicking in the conversation.
+    """
+    id: str
+    name: str
+    timezone: str
+    city: str
+    prompt: str
+
+    def is_valid(self) -> bool:
+        return bool(self.id and self.name and self.timezone and self.city and self.prompt)
+
+
+class MessageRole(StrEnum):
+    """
+    Who created a message.
+    """
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+@dataclass(frozen=True, slots=True)
+class Message:
+    """
+    A message in the conversation history.
+    """
+    role: MessageRole
+    content: str
+    timestamp: float = field(default_factory=time)
+
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Message":
+        role = MessageRole(data.get("role", ""))
+        content = str(data.get("content", ""))
+        timestamp = float(data.get("timestamp", 0.0))
+
+        return cls(
+            role=role,
+            content=content,
+            timestamp=timestamp,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryInfo:
+    """
+    Meta information about the conversation history.
+    """
+    max_messages: int
+    num_messages: int
+    num_user_messages: int
+    num_assistant_messages: int
 
 
 class BaseModelJSON(BaseModel):

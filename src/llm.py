@@ -16,9 +16,8 @@ from pydantic import BaseModel
 import yaml
 
 from src.config import get_settings
-from src.session import Message, MessageRole, Persona, User
 from src.weather import WeatherInfo
-from src.schema import Facts, EmotionalState, ConversationSummary
+from src.schema import Message, MessageRole, Persona, User, Facts, EmotionalState, ConversationSummary
 
 
 logger = logging.getLogger(__name__)

@@ -1,87 +1,15 @@
 import json
 import random
-import time
 from datetime import timedelta
-from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any, cast
-from enum import StrEnum
+from typing import List, Optional, cast
 
 import yaml
 from redis import Redis, WatchError
 
 from src.config import get_settings
 from src.telegram import TelegramMessage
-from src.schema import EmotionalState, Facts, ConversationSummary
-
-
-class MessageRole(StrEnum):
-    """
-    Who created a message.
-    """
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-
-
-@dataclass(frozen=True, slots=True)
-class Message:
-    """
-    A message in the conversation history.
-    """
-    role: MessageRole
-    content: str
-    timestamp: float = field(default_factory=time.time)
-
-    def to_dict(self) -> Dict[str, str]:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Message":
-        role = MessageRole(data.get("role", ""))
-        content = str(data.get("content", ""))
-        timestamp = float(data.get("timestamp", 0.0))
-
-        return cls(
-            role=role,
-            content=content,
-            timestamp=timestamp,
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class Persona:
-    """
-    Information about a persona that we are mimicking in the conversation.
-    """
-    id: str
-    name: str
-    timezone: str
-    city: str
-    prompt: str
-
-    def is_valid(self) -> bool:
-        return bool(self.id and self.name and self.timezone and self.city and self.prompt)
-
-
-@dataclass(frozen=True, slots=True)
-class User:
-    """
-    Information about a user that we are talking to.
-    """
-    first_name: Optional[str]
-    last_name: Optional[str]
-
-
-@dataclass(frozen=True, slots=True)
-class HistoryInfo:
-    """
-    Meta information about the conversation history.
-    """
-    max_messages: int
-    num_messages: int
-    num_user_messages: int
-    num_assistant_messages: int
+from src.schema import Persona, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary
 
 
 class SessionClient:

@@ -5,10 +5,11 @@ from time import time
 from datetime import timedelta
 
 from src.llm import ModelClient
-from src.session import Message, MessageRole, SessionClient, Persona, User
+from src.session import SessionClient
 from src.weather import fetch_weather, WeatherInfo
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_settings, get_queue
+from src.schema import Message, MessageRole, Persona, User
 from src import analytics
 
 

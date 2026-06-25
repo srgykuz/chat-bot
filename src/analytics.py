@@ -5,9 +5,9 @@ from time import time
 import statistics
 
 from src.config import get_settings
-from src.session import SessionClient, Message
+from src.session import SessionClient
 from src.llm import ModelClient
-from src.schema import EmotionalState, EmotionalStateLLM, Facts, ConversationSummary, ConversationSummaryLLM
+from src.schema import Message, EmotionalState, EmotionalStateLLM, Facts, ConversationSummary, ConversationSummaryLLM
 
 
 logger = logging.getLogger(__name__)
