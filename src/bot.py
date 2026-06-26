@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from time import time
 from datetime import timedelta
 
-from src.llm import ModelClient
+from src.llm import ModelClient, ModelResponse
 from src.session import SessionClient
 from src.weather import fetch_weather, WeatherInfo
 from src.telegram import TelegramClient, TelegramMessage, parse_update
@@ -205,18 +205,18 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         history.append(Message(role=MessageRole.USER, content=text))
 
     system_prompt = await build_system_prompt(chat_id, messages[-1])
-    response = ""
+    response: ModelResponse
     success = False
 
     try:
         response = await model_client.chat(system_prompt, history)
         success = True
     except Exception as e:
-        response = "🤖"
+        response = ModelResponse(content="🤖")
         success = False
         logger.error("LLM call error: %s", e, exc_info=True)
 
-    output = response.split(settings.output_separator)
+    output = response.content.split(settings.output_separator)
     output = [s.strip() for s in output if s.strip()]
 
     if success:

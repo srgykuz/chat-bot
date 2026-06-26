@@ -102,7 +102,7 @@ def infer_emotional_state(chat_id: int, history: list[Message]) -> None:
         user_prompt,
         response_format=EmotionalStateLLM,
     ))
-    state = EmotionalState.loads(result)
+    state = EmotionalState.loads(result.content)
 
     session_client.append_emotional_states(chat_id, state, 5)
 
@@ -161,7 +161,7 @@ def infer_facts(chat_id: int, history: list[Message]) -> None:
         user_prompt,
         response_format=Facts,
     ))
-    new_facts = Facts.loads(result)
+    new_facts = Facts.loads(result.content)
 
     if known_facts:
         new_facts.facts.extend(known_facts.facts)
@@ -204,7 +204,7 @@ def infer_conversation_summary(chat_id: int, history: list[Message]) -> None:
     ))
 
     now = time()
-    new_summary_llm = ConversationSummaryLLM.loads(result)
+    new_summary_llm = ConversationSummaryLLM.loads(result.content)
     new_summary = ConversationSummary(
         summaries=new_summary_llm.summaries,
         timestamps=[now for _ in new_summary_llm.summaries]

@@ -29,6 +29,14 @@ jinja = Environment(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class ModelResponse:
+    """
+    Result of LLM API call.
+    """
+    content: str
+
+
 class ProviderClient(ABC):
     """
     Base class that should be implemented by provider-specific LLM client.
@@ -49,15 +57,15 @@ class ProviderClient(ABC):
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         """
         Generates a response for a single-turn prompt.
 
         The prompt consist of a system instruction and a single user message
         the model should respond to.
 
-        Output is a generated assistant message text. If response_format is provided,
-        output is a JSON string.
+        Response is a generated assistant message text. If response_format is provided,
+        content is a JSON string.
         """
         pass
 
@@ -66,15 +74,15 @@ class ProviderClient(ABC):
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         """
         Generates a response for the supplied chat context.
 
         The context consist of system prompt, past user and assistant messages,
         and user's current message the model should respond to.
 
-        Output is a generated assistant message text. If response_format is provided,
-        output is a JSON string.
+        Response is a generated assistant message text. If response_format is provided,
+        content is a JSON string.
         """
         pass
 
@@ -133,35 +141,34 @@ class ModelClient:
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         """
         Takes pre-built prompts, calls LLM API and returns generated response.
 
         system_prompt is a system instructions, user_prompt is a user request the
         model should respond to.
 
-        Returns model response as a plain string. If response_format is provided,
-        returns JSON string which you should parse and validate using Pydantic's model_validate_json().
+        Returns model response. If response_format is provided, content is a JSON string
+        which you should parse and validate using Pydantic's model_validate_json().
         """
         if not user_prompt:
             raise RuntimeError("User prompt is required.")
 
-        output = await asyncio.to_thread(
+        response = await asyncio.to_thread(
             self.provider.generate,
             system_prompt,
             user_prompt,
             response_format,
         )
-        output = output.strip()
 
-        return output
+        return response
 
     async def chat(
         self,
         system_prompt: str,
         conversation: List[Message],
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         """
         Builds full chat context, calls LLM API and returns generated response
         to the last user messages.
@@ -173,8 +180,8 @@ class ModelClient:
         and should contain user's current message the model should respond to. Sorted from
         oldest to newest.
 
-        Returns model response as a plain string. If response_format is provided,
-        returns JSON string which you should parse and validate using Pydantic's model_validate_json().
+        Returns model response. If response_format is provided, content is a JSON string
+        which you should parse and validate using Pydantic's model_validate_json().
         """
         if not conversation:
             raise RuntimeError("Conversation must contain at least one message.")
@@ -185,11 +192,9 @@ class ModelClient:
         context = [
             Message(role=MessageRole.SYSTEM, content=system_prompt)
         ] + conversation
+        response = await asyncio.to_thread(self.provider.chat, context, response_format)
 
-        output = await asyncio.to_thread(self.provider.chat, context, response_format)
-        output = output.strip()
-
-        return output
+        return response
 
     def build_system_prompt(
         self,
@@ -293,7 +298,7 @@ class OpenAIClient(ProviderClient):
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         config = self.parent.load_config(self.parent.config_name)
         params = dict(config.params)
 
@@ -305,9 +310,11 @@ class OpenAIClient(ProviderClient):
             params["text_format"] = response_format
 
         response = self.client.responses.parse(**params)
-        output = response.output_text or ""
+        result = ModelResponse(
+            content=(response.output_text or "")
+        )
 
-        if not output:
+        if not result.content:
             raise RuntimeError("No response.")
 
         params_log = dict(params)
@@ -319,13 +326,13 @@ class OpenAIClient(ProviderClient):
             getattr(response, "usage", None),
         )
 
-        return output
+        return result
 
     def chat(
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         config = self.parent.load_config(self.parent.config_name)
 
         messages = [
@@ -343,7 +350,9 @@ class OpenAIClient(ProviderClient):
         if not completion.choices:
             raise RuntimeError("No response.")
 
-        output = completion.choices[0].message.content or ""
+        result = ModelResponse(
+            content=(completion.choices[0].message.content or "")
+        )
 
         params_log = dict(config.params)
         params_log.pop("messages", None)
@@ -354,7 +363,7 @@ class OpenAIClient(ProviderClient):
             getattr(completion, "usage", None),
         )
 
-        return output
+        return result
 
 
 class GoogleClient(ProviderClient):
@@ -374,7 +383,7 @@ class GoogleClient(ProviderClient):
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         config = self.parent.load_config(self.parent.config_name)
         params = dict(config.params)
 
@@ -391,7 +400,9 @@ class GoogleClient(ProviderClient):
             contents=user_prompt,
             config=generate_config,
         )
-        output = response.text or ""
+        result = ModelResponse(
+            content=(response.text or ""),
+        )
 
         logger.info(
             "Google generate: model=%s params=%s usage=%s",
@@ -400,13 +411,13 @@ class GoogleClient(ProviderClient):
             getattr(response, "usage_metadata", None),
         )
 
-        return output
+        return result
 
     def chat(
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         system_prompt = ""
         history = []
 
@@ -454,7 +465,9 @@ class GoogleClient(ProviderClient):
         )
 
         response = chat.send_message(curr_message)
-        output = response.text or ""
+        result = ModelResponse(
+            content=(response.text or "")
+        )
 
         logger.info(
             "Google chat: model=%s params=%s usage=%s",
@@ -463,7 +476,7 @@ class GoogleClient(ProviderClient):
             getattr(response, "usage_metadata", None),
         )
 
-        return output
+        return result
 
 
 class OllamaClient(ProviderClient):
@@ -488,7 +501,7 @@ class OllamaClient(ProviderClient):
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         config = self.parent.load_config(self.parent.config_name)
         params = dict(config.params)
 
@@ -501,9 +514,11 @@ class OllamaClient(ProviderClient):
             system=system_prompt,
             **params,
         )
-        output = response.response
+        result = ModelResponse(
+            content=response.response,
+        )
 
-        if not output:
+        if not result.content:
             raise RuntimeError("No response.")
 
         usage = {
@@ -522,13 +537,13 @@ class OllamaClient(ProviderClient):
             usage,
         )
 
-        return output
+        return result
 
     def chat(
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
-    ) -> str:
+    ) -> ModelResponse:
         config = self.parent.load_config(self.parent.config_name)
         messages = [
             {"role": msg.role.value, "content": msg.content}
@@ -539,9 +554,11 @@ class OllamaClient(ProviderClient):
             config.params["format"] = response_format.model_json_schema()
 
         response = self.client.chat(model=config.model, messages=messages, **config.params)
-        output = response.message.content
+        result = ModelResponse(
+            content=response.message.content,
+        )
 
-        if not output:
+        if not result.content:
             raise RuntimeError("No response.")
 
         params_log = dict(config.params)
@@ -561,7 +578,7 @@ class OllamaClient(ProviderClient):
             usage,
         )
 
-        return output
+        return result
 
 
 if __name__ == "__main__":
@@ -579,16 +596,15 @@ if __name__ == "__main__":
             content="Alice and Bob are going to a science fair on Friday."
         )
     ]
-    response_format = CalendarEvent
 
     client = ModelClient("chat")
-    output = asyncio.run(
+    response = asyncio.run(
         client.chat(
             system_prompt,
             conversation,
-            response_format=response_format,
+            response_format=CalendarEvent,
         )
     )
-    result = CalendarEvent.model_validate_json(output)
+    result = CalendarEvent.model_validate_json(response.content)
 
     print(result)
