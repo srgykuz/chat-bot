@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -12,12 +13,12 @@ from jinja2 import Environment, StrictUndefined
 from google import genai
 from google.genai.types import GenerateContentConfig, ModelContent, Part, UserContent
 import ollama
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import yaml
 
 from src.config import get_settings
 from src.weather import WeatherInfo
-from src.schema import Message, MessageRole, Persona, User, Facts, EmotionalState, ConversationSummary
+from src.schema import Message, MessageRole, Persona, User, Facts, EmotionalState, ConversationSummary, Tool
 
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ class ProviderClient(ABC):
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
         """
         Generates a response for the supplied chat context.
@@ -168,6 +170,7 @@ class ModelClient:
         system_prompt: str,
         conversation: List[Message],
         response_format: Optional[type[BaseModel]] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
         """
         Builds full chat context, calls LLM API and returns generated response
@@ -192,7 +195,7 @@ class ModelClient:
         context = [
             Message(role=MessageRole.SYSTEM, content=system_prompt)
         ] + conversation
-        response = await asyncio.to_thread(self.provider.chat, context, response_format)
+        response = await asyncio.to_thread(self.provider.chat, context, response_format, tools)
 
         return response
 
@@ -332,10 +335,11 @@ class OpenAIClient(ProviderClient):
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
         config = self.parent.load_config(self.parent.config_name)
 
-        messages = [
+        messages: List[dict[str, Any]] = [
             {"role": msg.role.value, "content": msg.content}
             for msg in context
         ]
@@ -345,22 +349,62 @@ class OpenAIClient(ProviderClient):
         if response_format:
             config.params["response_format"] = response_format
 
-        completion = self.client.chat.completions.parse(**config.params)
+        if tools:
+            config.params["tools"] = [
+                {"type": "function", "function": t.definition(strict=True)}
+                for t in tools
+            ]
 
-        if not completion.choices:
-            raise RuntimeError("No response.")
+        response = None
+        count = 0
+
+        while True:
+            if count >= 10:
+                raise RuntimeError("Infinite loop protection.")
+
+            response = self.client.chat.completions.parse(**config.params)
+            count += 1
+            message = response.choices[0].message
+
+            if message.tool_calls:
+                if not tools:
+                    raise RuntimeError("No tools defined.")
+
+                messages.append({
+                    "role": MessageRole.ASSISTANT.value,
+                    "tool_calls": message.tool_calls,
+                })
+
+                for call in message.tool_calls:
+                    for tool in tools:
+                        if call.function.name == tool.name:
+                            args = json.loads(call.function.arguments)
+                            result = tool.f(**args)
+
+                            messages.append({
+                                "role": MessageRole.TOOL.value,
+                                "content": str(result),
+                                "tool_call_id": call.id,
+                            })
+
+                            break
+            else:
+                break
 
         result = ModelResponse(
-            content=(completion.choices[0].message.content or "")
+            content=(response.choices[0].message.content or "")
         )
-
         params_log = dict(config.params)
+
         params_log.pop("messages", None)
+        params_log.pop("response_format", None)
+        params_log.pop("tools", None)
+
         logger.info(
             "OpenAI chat: model=%s params=%s usage=%s",
-            getattr(completion, "model", None),
+            getattr(response, "model", None),
             params_log,
-            getattr(completion, "usage", None),
+            getattr(response, "usage", None),
         )
 
         return result
@@ -417,6 +461,7 @@ class GoogleClient(ProviderClient):
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
         system_prompt = ""
         history = []
@@ -450,9 +495,15 @@ class GoogleClient(ProviderClient):
         curr_message = last.parts[0].text
         config = self.parent.load_config(self.parent.config_name)
 
+        if response_format and tools and ("gemini-2" in config.model):
+            raise RuntimeError("Function calling with Structured output is available only for Gemini 3 models.")
+
         if response_format:
             config.params["responseMimeType"] = "application/json"
             config.params["responseJsonSchema"] = response_format.model_json_schema()
+
+        if tools:
+            config.params["tools"] = [t.f for t in tools]
 
         generate_config = GenerateContentConfig(
             system_instruction=system_prompt,
@@ -543,32 +594,75 @@ class OllamaClient(ProviderClient):
         self,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
         config = self.parent.load_config(self.parent.config_name)
         messages = [
-            {"role": msg.role.value, "content": msg.content}
+            ollama.Message(role=msg.role.value, content=msg.content)
             for msg in context
         ]
 
         if response_format:
             config.params["format"] = response_format.model_json_schema()
 
-        response = self.client.chat(model=config.model, messages=messages, **config.params)
+        if tools:
+            config.params["tools"] = [t.f for t in tools]
+
+        response: Optional[ollama.ChatResponse] = None
+        count = 0
+
+        while True:
+            if count >= 10:
+                raise RuntimeError("Infinite loop protection.")
+
+            response = self.client.chat(model=config.model, messages=messages, **config.params)
+            count += 1
+
+            if not response:
+                raise RuntimeError("No response.")
+
+            if response.message.tool_calls:
+                if not tools:
+                    raise RuntimeError("No tools defined.")
+
+                messages.append(response.message)
+
+                for call in response.message.tool_calls:
+                    for tool in tools:
+                        if call.function.name == tool.name:
+                            result = tool.f(**call.function.arguments)
+
+                            messages.append(ollama.Message(
+                                role=MessageRole.TOOL.value,
+                                content=str(result),
+                                tool_name=call.function.name,
+                            ))
+
+                            break
+            else:
+                break
+
+        if not response:
+            raise RuntimeError("No response.")
+
         result = ModelResponse(
-            content=response.message.content,
+            content=(response.message.content or ""),
         )
 
         if not result.content:
             raise RuntimeError("No response.")
 
         params_log = dict(config.params)
+        params_log.pop("format", None)
+        params_log.pop("tools", None)
+
         usage = {
-            "total_duration": response.total_duration / 1e9,
-            "load_duration": response.load_duration / 1e9,
-            "prompt_eval_count": response.prompt_eval_count,
-            "prompt_eval_duration": response.prompt_eval_duration / 1e9,
-            "eval_count": response.eval_count,
-            "eval_duration": response.eval_duration / 1e9,
+            "total_duration": (response.total_duration or 0) / 1e9,
+            "load_duration": (response.load_duration or 0) / 1e9,
+            "prompt_eval_count": (response.prompt_eval_count or 0),
+            "prompt_eval_duration": (response.prompt_eval_duration or 0) / 1e9,
+            "eval_count": (response.eval_count or 0),
+            "eval_duration": (response.eval_duration or 0) / 1e9,
         }
 
         logger.info(
@@ -589,11 +683,38 @@ if __name__ == "__main__":
         date: str
         participants: list[str]
 
-    system_prompt = "Extract the event information."
+    class GetParticipantsParams(BaseModel):
+        day: str = Field(description="Day of the week.")
+
+    def get_participants(day: str) -> str:
+        """Returns a participants of the event according to the weekday.
+
+        Args:
+            day: Day of the week.
+
+        Returns:
+            A participants.
+        """
+        if day.lower() == "friday":
+            return "Alice and Bob"
+
+        return ""
+
+    system_prompt = (
+        "Extract the event information. "
+        "Call function to get the event participants. "
+        "Return result as a JSON string strictly matching the requested schema."
+    )
     conversation = [
         Message(
             role=MessageRole.USER,
-            content="Alice and Bob are going to a science fair on Friday."
+            content="They are going to a science fair on Friday."
+        )
+    ]
+    tools = [
+        Tool(
+            f=get_participants,
+            params=GetParticipantsParams,
         )
     ]
 
@@ -603,6 +724,7 @@ if __name__ == "__main__":
             system_prompt,
             conversation,
             response_format=CalendarEvent,
+            tools=tools,
         )
     )
     result = CalendarEvent.model_validate_json(response.content)

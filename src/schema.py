@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Self, Optional
+from typing import Any, Self, Callable, Type
 from time import time
 
 from pydantic import BaseModel, Field
@@ -31,6 +31,7 @@ class MessageRole(StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
+    TOOL = "tool"
 
 
 class Message(BaseModelJSON):
@@ -110,3 +111,33 @@ class ConversationSummary(ConversationSummaryLLM):
 
     def to_llm(self) -> ConversationSummaryLLM:
         return ConversationSummaryLLM.model_validate(self.model_dump())
+
+
+class ToolNoParams(BaseModel):
+    pass
+
+
+class Tool(BaseModel):
+    f: Callable[..., Any]
+    params: Type[BaseModel]
+
+    @property
+    def name(self) -> str:
+        return self.f.__name__
+
+    def definition(self, strict: bool = False) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "name": self.f.__name__,
+            "description": (self.f.__doc__ or "").strip("\n"),
+        }
+
+        if self.params is ToolNoParams:
+            d["parameters"] = {}
+        else:
+            d["parameters"] = self.params.model_json_schema()
+
+        if strict:
+            d["strict"] = True
+            d["parameters"]["additionalProperties"] = False
+
+        return d
