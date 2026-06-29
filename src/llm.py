@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import openai
-from jinja2 import Environment, StrictUndefined
 from google import genai
-from google.genai.types import GenerateContentConfig, ModelContent, Part, UserContent
+from google.genai import types as genai_types
 import ollama
+from jinja2 import Environment, StrictUndefined
 from pydantic import BaseModel, Field
 import yaml
 
@@ -317,9 +317,6 @@ class OpenAIClient(ProviderClient):
             content=(response.output_text or "")
         )
 
-        if not result.content:
-            raise RuntimeError("No response.")
-
         params_log = dict(params)
         params_log.pop("input", None)
         logger.info(
@@ -435,7 +432,7 @@ class GoogleClient(ProviderClient):
             params["responseMimeType"] = "application/json"
             params["responseJsonSchema"] = response_format.model_json_schema()
 
-        generate_config = GenerateContentConfig(
+        generate_config = genai_types.GenerateContentConfig(
             system_instruction=system_prompt,
             **params,
         )
@@ -473,9 +470,9 @@ class GoogleClient(ProviderClient):
                 system_prompt = msg.content
                 continue
             elif msg.role == MessageRole.USER:
-                content = UserContent(parts=[Part(text=msg.content)])
+                content = genai_types.UserContent(parts=[genai_types.Part(text=msg.content)])
             elif msg.role == MessageRole.ASSISTANT:
-                content = ModelContent(parts=[Part(text=msg.content)])
+                content = genai_types.ModelContent(parts=[genai_types.Part(text=msg.content)])
             else:
                 raise ValueError(f"Unknown message role: {msg.role}")
 
@@ -489,7 +486,7 @@ class GoogleClient(ProviderClient):
 
         last = history.pop()
 
-        if not isinstance(last, UserContent):
+        if not isinstance(last, genai_types.UserContent):
             raise ValueError("Last message in context should be from user")
 
         curr_message = last.parts[0].text
@@ -505,7 +502,7 @@ class GoogleClient(ProviderClient):
         if tools:
             config.params["tools"] = [t.f for t in tools]
 
-        generate_config = GenerateContentConfig(
+        generate_config = genai_types.GenerateContentConfig(
             system_instruction=system_prompt,
             **config.params,
         )
@@ -568,9 +565,6 @@ class OllamaClient(ProviderClient):
         result = ModelResponse(
             content=response.response,
         )
-
-        if not result.content:
-            raise RuntimeError("No response.")
 
         usage = {
             "total_duration": response.total_duration / 1e9,
@@ -642,15 +636,9 @@ class OllamaClient(ProviderClient):
             else:
                 break
 
-        if not response:
-            raise RuntimeError("No response.")
-
         result = ModelResponse(
             content=(response.message.content or ""),
         )
-
-        if not result.content:
-            raise RuntimeError("No response.")
 
         params_log = dict(config.params)
         params_log.pop("format", None)
