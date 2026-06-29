@@ -24,6 +24,7 @@ class Persona(BaseModelJSON):
     name: str
     timezone: str
     city: str
+    language: str
     prompt: str
 
 

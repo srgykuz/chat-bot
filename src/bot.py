@@ -252,7 +252,7 @@ async def build_system_prompt(chat_id: int, msg: TelegramMessage) -> str:
     persona_weather: Optional[WeatherInfo] = None
 
     try:
-        persona_weather = await fetch_weather(persona.city, lang="ru")
+        persona_weather = await fetch_weather(persona.city, lang=persona.language)
     except Exception as e:
         logger.error(f"Error fetching weather info: {e}")
 

@@ -55,7 +55,7 @@ async def fetch_weather(city: str, lang: str = "", use_cache: bool = True) -> We
     if not settings.weatherapi_api_key:
         raise RuntimeError("WeatherAPI API key is not configured")
 
-    cache_key = f"weather:{city.casefold()}"
+    cache_key = f"weather:{city.casefold()}:{lang.casefold()}"
 
     if use_cache:
         cached = cast(str | None, redis.get(cache_key))

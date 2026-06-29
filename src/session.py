@@ -139,6 +139,7 @@ class SessionClient:
             name = str(params.get("name", None) or "").strip()
             timezone = str(params.get("timezone", None) or "").strip()
             city = str(params.get("city", None) or "").strip()
+            language = str(params.get("language", None) or "").strip()
 
             prompt_path = persona_dir / "prompt.md"
 
@@ -155,6 +156,7 @@ class SessionClient:
                 name=name,
                 timezone=timezone,
                 city=city,
+                language=language,
                 prompt=prompt,
             )
 
