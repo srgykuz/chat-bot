@@ -242,8 +242,8 @@ async def build_system_prompt(chat_id: int, msg: TelegramMessage) -> str:
     Builds system prompt for chat LLM call.
     """
     user = User(
-        first_name=msg.first_name,
-        last_name=msg.last_name,
+        first_name=(msg.first_name or ""),
+        last_name=(msg.last_name or ""),
     )
     persona = session_client.init_persona(chat_id)
     user_facts = session_client.get_facts(chat_id)
