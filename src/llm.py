@@ -30,7 +30,7 @@ jinja = Environment(
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class ModelResponse:
     """
     Result of LLM API call.
@@ -196,6 +196,7 @@ class ModelClient:
             Message(role=MessageRole.SYSTEM, content=system_prompt)
         ] + conversation
         response = await asyncio.to_thread(self.provider.chat, context, response_format, tools)
+        response.content = self.format_assistant_response(response.content)
 
         return response
 
@@ -282,6 +283,14 @@ class ModelClient:
             raise RuntimeError(f"Invalid model config: {name}")
 
         return model_config
+
+    def format_assistant_response(self, content: str) -> str:
+        """
+        Formats assistant chat response to add more "humanity".
+        """
+        content = content.replace("—", "-")
+
+        return content
 
 
 class OpenAIClient(ProviderClient):
