@@ -1,7 +1,10 @@
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, asdict
 from typing import cast, Any
+
+from pydantic import BaseModel, Field
 
 from src.config import get_settings, get_redis, get_httpx
 
@@ -109,6 +112,28 @@ async def fetch_weather(city: str, lang: str = "", use_cache: bool = True) -> We
         )
 
     return info
+
+
+class FetchWeatherToolParams(BaseModel):
+    city: str = Field(description="Name of the city.")
+
+
+def fetch_weather_tool(city: str) -> str:
+    """
+    Fetches current weather information for a given city.
+
+    Args:
+        city: Name of the city.
+
+    Returns:
+        Weather information as a plain string.
+    """
+    logger.info(f"tool call: fetch_weather_tool: {city}")
+
+    info = asyncio.run(fetch_weather(city, lang="", use_cache=True))
+    result = f"temp_celsius - {info.temp_c}, condition - {info.condition_text}"
+
+    return result
 
 
 if __name__ == "__main__":

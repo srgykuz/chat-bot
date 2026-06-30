@@ -6,10 +6,10 @@ from datetime import timedelta
 
 from src.llm import ModelClient, ModelResponse
 from src.session import SessionClient
-from src.weather import fetch_weather, WeatherInfo
+from src.weather import fetch_weather, fetch_weather_tool, WeatherInfo, FetchWeatherToolParams
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_settings, get_queue
-from src.schema import Message, MessageRole, Persona, User
+from src.schema import Message, MessageRole, Persona, User, Tool
 from src import analytics
 
 
@@ -205,11 +205,13 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         history.append(Message(role=MessageRole.USER, content=text))
 
     system_prompt = await build_system_prompt(chat_id, messages[-1])
+    tools = build_tools()
+
     response: ModelResponse
     success = False
 
     try:
-        response = await model_client.chat(system_prompt, history)
+        response = await model_client.chat(system_prompt, history, tools=tools)
         success = True
     except Exception as e:
         response = ModelResponse(content="🤖")
@@ -266,6 +268,18 @@ async def build_system_prompt(chat_id: int, msg: TelegramMessage) -> str:
     )
 
     return system_prompt
+
+
+def build_tools() -> list[Tool]:
+    """
+    Returns a list of available tools for chat LLM call.
+    """
+    return [
+        Tool(
+            f=fetch_weather_tool,
+            params=FetchWeatherToolParams,
+        ),
+    ]
 
 
 def calc_typing_duration(text: str) -> float:
