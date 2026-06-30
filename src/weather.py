@@ -4,14 +4,14 @@ import logging
 from dataclasses import dataclass, asdict
 from typing import cast, Any
 
+import httpx
 from pydantic import BaseModel, Field
 
-from src.config import get_settings, get_redis, get_httpx
+from src.config import get_settings, get_redis
 
 
 logger = logging.getLogger(__name__)
 redis = get_redis()
-httpx = get_httpx()
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,10 +78,13 @@ async def fetch_weather(city: str, lang: str = "", use_cache: bool = True) -> We
     if lang:
         params["lang"] = lang
 
-    response = await httpx.get(
-        "https://api.weatherapi.com/v1/current.json",
-        params=params,
-    )
+    response = None
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.weatherapi.com/v1/current.json",
+            params=params,
+        )
 
     response.raise_for_status()
 

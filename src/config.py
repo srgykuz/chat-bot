@@ -4,7 +4,6 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redis import Redis
 from rq import Queue
-import httpx
 
 
 class Settings(BaseSettings):
@@ -109,13 +108,6 @@ def get_queue() -> Queue:
     redis = get_redis(decode_responses=False)
 
     return Queue("default", connection=redis)
-
-
-@lru_cache()
-def get_httpx() -> httpx.AsyncClient:
-    """Returns an HTTPX AsyncClient instance."""
-
-    return httpx.AsyncClient(timeout=10)
 
 
 if __name__ == "__main__":
