@@ -168,6 +168,7 @@ async def handle_message(message: TelegramMessage) -> None:
         return
 
     token = session_client.buffer_message(chat_id, message)
+    session_client.set_last_user_message_timestamp(chat_id, message.date or int(time()))
 
     enqueue_flush_buffered_messages(chat_id, token)
     enqueue_analytics(chat_id)

@@ -39,6 +39,7 @@ class SessionClient:
         pipe.delete(self._messages_pending_key(chat_id))
         pipe.delete(self._messages_token_key(chat_id))
         pipe.delete(self._messages_processing_key(chat_id))
+        pipe.delete(self._last_user_message_timestamp_key(chat_id))
         pipe.delete(self._facts_key(chat_id))
         pipe.delete(self._emotional_states_key(chat_id))
         pipe.delete(self._emotional_state_key(chat_id))
@@ -75,6 +76,12 @@ class SessionClient:
         Returns the Redis key for storing messages that are currently being processed for a specific chat.
         """
         return f"session:{chat_id}:messages_processing"
+
+    def _last_user_message_timestamp_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing the timestamp of the latest user message for a specific chat.
+        """
+        return f"session:{chat_id}:last_user_message_timestamp"
 
     def _analytics_lock_key(self, chat_id: int, name: str) -> str:
         """
@@ -267,6 +274,26 @@ class SessionClient:
         pipe.ltrim(key, -self.settings.history_limit, -1)
 
         pipe.execute()
+
+    def set_last_user_message_timestamp(self, chat_id: int, timestamp: int) -> None:
+        """
+        Stores the timestamp of the latest user message for the given chat ID.
+        """
+        key = self._last_user_message_timestamp_key(chat_id)
+
+        self.redis.set(key, str(timestamp))
+
+    def get_last_user_message_timestamp(self, chat_id: int) -> Optional[int]:
+        """
+        Returns the timestamp of the latest user message for the given chat ID, or None if not set.
+        """
+        key = self._last_user_message_timestamp_key(chat_id)
+        value = cast(Optional[str], self.redis.get(key))
+
+        if value is None:
+            return None
+
+        return int(value)
 
     def get_history_info(self, chat_id: int) -> HistoryInfo:
         """
