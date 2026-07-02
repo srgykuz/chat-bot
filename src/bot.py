@@ -120,7 +120,7 @@ async def handle_command(message: TelegramMessage) -> None:
         session_client.clear(chat_id)
         response = "Session cleared."
     elif command == "/get_prompt":
-        file_content = await build_system_prompt(chat_id, message)
+        file_content = await build_system_prompt(chat_id)
         file_name = f"prompt-{int(time())}.txt"
     else:
         response = (
@@ -167,6 +167,7 @@ async def handle_message(message: TelegramMessage) -> None:
     if not text:
         return
 
+    session_client.set_user(chat_id, message.user())
     token = session_client.buffer_message(chat_id, message)
     session_client.set_last_user_message_timestamp(chat_id, message.date or int(time()))
 
@@ -205,7 +206,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
     for text in input:
         history.append(Message(role=MessageRole.USER, content=text))
 
-    system_prompt = await build_system_prompt(chat_id, messages[-1])
+    system_prompt = await build_system_prompt(chat_id)
     tools = build_tools()
 
     response: ModelResponse
@@ -240,15 +241,16 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         await telegram_client.send_message(chat_id=chat_id, text=text)
 
 
-async def build_system_prompt(chat_id: int, msg: TelegramMessage) -> str:
+async def build_system_prompt(chat_id: int) -> str:
     """
     Builds system prompt for chat LLM call.
     """
-    user = User(
-        first_name=(msg.first_name or ""),
-        last_name=(msg.last_name or ""),
-    )
     persona = session_client.init_persona(chat_id)
+    user = session_client.get_user(chat_id)
+
+    if not user:
+        raise Exception("User is not set.")
+
     user_facts = session_client.get_facts(chat_id)
     user_emotional_state = session_client.get_emotional_state(chat_id)
     conversation_summary = session_client.get_conversation_summary(chat_id)

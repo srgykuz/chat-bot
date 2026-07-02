@@ -9,7 +9,7 @@ from redis import Redis, WatchError
 
 from src.config import get_settings
 from src.telegram import TelegramMessage
-from src.schema import Persona, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary
+from src.schema import Persona, User, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary
 
 
 class SessionClient:
@@ -36,6 +36,7 @@ class SessionClient:
 
         pipe.delete(self._history_key(chat_id))
         pipe.delete(self._persona_key(chat_id))
+        pipe.delete(self._user_key(chat_id))
         pipe.delete(self._messages_pending_key(chat_id))
         pipe.delete(self._messages_token_key(chat_id))
         pipe.delete(self._messages_processing_key(chat_id))
@@ -112,6 +113,12 @@ class SessionClient:
         Returns the Redis key for storing conversation summaries for a specific chat.
         """
         return f"session:{chat_id}:conversation_summary"
+
+    def _user_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing the current user of a specific chat.
+        """
+        return f"session:{chat_id}:user"
 
     def load_personas(self) -> List[Persona]:
         """
@@ -242,6 +249,27 @@ class SessionClient:
         self.set_persona(chat_id, new_persona)
 
         return new_persona
+
+    def set_user(self, chat_id: int, user: User) -> None:
+        """
+        Stores the current user for the given chat ID.
+        """
+        key = self._user_key(chat_id)
+        value = user.dumps()
+
+        self.redis.set(key, value)
+
+    def get_user(self, chat_id: int) -> Optional[User]:
+        """
+        Returns the current user for the given chat ID, or None if not set.
+        """
+        key = self._user_key(chat_id)
+        value = cast(Optional[str], self.redis.get(key))
+
+        if value:
+            return User.loads(value)
+
+        return None
 
     def get_history(self, chat_id: int) -> List[Message]:
         """

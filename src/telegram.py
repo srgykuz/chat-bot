@@ -7,6 +7,7 @@ from typing import Any, Callable, Coroutine, Dict, Optional
 import httpx
 
 from src.config import get_settings
+from src.schema import User
 
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,12 @@ class TelegramMessage:
             last_name=data.get("last_name"),
             text=data.get("text"),
             date=data.get("date"),
+        )
+
+    def user(self) -> User:
+        return User(
+            first_name=(self.first_name or ""),
+            last_name=(self.last_name or ""),
         )
 
 
