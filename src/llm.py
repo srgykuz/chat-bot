@@ -162,6 +162,7 @@ class ModelClient:
             user_prompt,
             response_format,
         )
+        response.content = self.format_assistant_response(response.content)
 
         return response
 
