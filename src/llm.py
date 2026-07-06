@@ -339,6 +339,8 @@ class ModelClient:
         Formats assistant chat response to add more "humanity".
         """
         content = content.replace("—", "-")
+        content = content.replace("«", '"')
+        content = content.replace("»", '"')
 
         return content
 
