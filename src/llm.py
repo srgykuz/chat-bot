@@ -214,6 +214,61 @@ class ModelClient:
         required placeholders. You should pass returned string as system prompt
         to the chat() method.
         """
+        context = self.build_prompt_context(
+            persona,
+            user,
+            persona_weather=persona_weather,
+            user_facts=user_facts,
+            user_emotional_state=user_emotional_state,
+            conversation_summary=conversation_summary,
+        )
+        context["persona_prompt"] = self.build_persona_prompt(
+            persona,
+            user,
+            persona_weather=persona_weather,
+            user_facts=user_facts,
+            user_emotional_state=user_emotional_state,
+            conversation_summary=conversation_summary,
+        )
+        system_prompt = self.load_system_prompt()
+
+        return jinja.from_string(system_prompt).render(context)
+
+    def build_persona_prompt(
+        self,
+        persona: Persona,
+        user: User,
+        persona_weather: Optional[WeatherInfo] = None,
+        user_facts: Optional[Facts] = None,
+        user_emotional_state: Optional[EmotionalState] = None,
+        conversation_summary: Optional[ConversationSummary] = None,
+    ) -> str:
+        """
+        Creates a persona-only prompt by rendering the persona template.
+        """
+        context = self.build_prompt_context(
+            persona,
+            user,
+            persona_weather=persona_weather,
+            user_facts=user_facts,
+            user_emotional_state=user_emotional_state,
+            conversation_summary=conversation_summary,
+        )
+
+        return jinja.from_string(persona.prompt).render(context)
+
+    def build_prompt_context(
+        self,
+        persona: Persona,
+        user: User,
+        persona_weather: Optional[WeatherInfo] = None,
+        user_facts: Optional[Facts] = None,
+        user_emotional_state: Optional[EmotionalState] = None,
+        conversation_summary: Optional[ConversationSummary] = None,
+    ) -> Dict[str, Any]:
+        """
+        Creates prompt context that can be used to enrich prompt template.
+        """
         persona_tz = ZoneInfo(persona.timezone)
         persona_dt = datetime.now(tz=persona_tz)
         persona_now = persona_dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -239,12 +294,7 @@ class ModelClient:
             "conversation_summary": conversation_summary,
         }
 
-        persona_prompt = jinja.from_string(persona.prompt).render(context)
-        context["persona_prompt"] = persona_prompt
-
-        system_prompt = self.load_system_prompt()
-
-        return jinja.from_string(system_prompt).render(context)
+        return context
 
     def load_system_prompt(self) -> str:
         """
