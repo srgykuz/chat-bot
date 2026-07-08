@@ -154,6 +154,7 @@ class SessionClient:
             timezone = str(params.get("timezone", None) or "").strip()
             city = str(params.get("city", None) or "").strip()
             language = str(params.get("language", None) or "").strip()
+            proactivity = params.get("proactivity", 0.0)
 
             prompt_path = persona_dir / "prompt.md"
 
@@ -171,6 +172,7 @@ class SessionClient:
                 timezone=timezone,
                 city=city,
                 language=language,
+                proactivity=proactivity,
                 prompt=prompt,
             )
 

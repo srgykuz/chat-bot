@@ -25,6 +25,7 @@ class Persona(BaseModelJSON):
     timezone: str
     city: str
     language: str
+    proactivity: float = Field(..., ge=0.0, le=1.0)
     prompt: str
 
 
