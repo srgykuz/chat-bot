@@ -1,6 +1,8 @@
 from enum import StrEnum
 from typing import Any, Self, Callable, Type
 from time import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +29,9 @@ class Persona(BaseModelJSON):
     language: str
     proactivity: float = Field(..., ge=0.0, le=1.0)
     prompt: str
+
+    def now(self) -> datetime:
+        return datetime.now(tz=ZoneInfo(self.timezone))
 
 
 class MessageRole(StrEnum):

@@ -3,8 +3,6 @@ import asyncio
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
-from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -270,8 +268,7 @@ class ModelClient:
         """
         Creates prompt context that can be used to enrich prompt template.
         """
-        persona_tz = ZoneInfo(persona.timezone)
-        persona_dt = datetime.now(tz=persona_tz)
+        persona_dt = persona.now()
         persona_now = persona_dt.strftime("%Y-%m-%d %H:%M:%S")
         persona_weekday = [
             "Понедельник",
