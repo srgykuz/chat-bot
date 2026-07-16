@@ -9,7 +9,7 @@ from redis import Redis, WatchError
 
 from src.config import get_settings
 from src.telegram import TelegramMessage
-from src.schema import Persona, User, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary
+from src.schema import Persona, User, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary, ProactivityState
 
 
 class SessionClient:
@@ -45,6 +45,7 @@ class SessionClient:
         pipe.delete(self._emotional_states_key(chat_id))
         pipe.delete(self._emotional_state_key(chat_id))
         pipe.delete(self._conversation_summary_key(chat_id))
+        pipe.delete(self._proactivity_state_key(chat_id))
 
         pipe.execute()
 
@@ -89,6 +90,12 @@ class SessionClient:
         Returns the Redis key for storing analytics lock for a specific chat and analytics function.
         """
         return f"session:{chat_id}:analytics_lock:{name}"
+
+    def _proactivity_state_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing proactivity state for a specific chat.
+        """
+        return f"session:{chat_id}:proactivity_state"
 
     def _facts_key(self, chat_id: int) -> str:
         """
@@ -532,5 +539,26 @@ class SessionClient:
 
         if value:
             return ConversationSummary.loads(value)
+
+        return None
+
+    def set_proactivity_state(self, chat_id: int, state: ProactivityState) -> None:
+        """
+        Stores the current proactivity state for the given chat ID.
+        """
+        key = self._proactivity_state_key(chat_id)
+        value = state.dumps()
+
+        self.redis.set(key, value)
+
+    def get_proactivity_state(self, chat_id: int) -> Optional[ProactivityState]:
+        """
+        Returns the current proactivity state for the given chat ID, or None if not set.
+        """
+        key = self._proactivity_state_key(chat_id)
+        value = cast(Optional[str], self.redis.get(key))
+
+        if value:
+            return ProactivityState.loads(value)
 
         return None

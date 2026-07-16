@@ -9,6 +9,7 @@ from src.config import get_settings, get_redis
 from src.bot import handle_update, aclose as bot_aclose
 from src.telegram import TelegramPoller
 from src.analytics import close as analytics_close
+from src.proactivity import close as proactivity_close
 
 
 logging.basicConfig(
@@ -48,6 +49,7 @@ async def on_shutdown():
 
     await bot_aclose()
     analytics_close()
+    proactivity_close()
     get_redis().close()
 
 

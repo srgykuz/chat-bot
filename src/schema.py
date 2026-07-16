@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum, StrEnum, auto
 from typing import Any, Self, Callable, Type
 from time import time
 from datetime import datetime
@@ -148,3 +148,22 @@ class Tool(BaseModel):
             d["parameters"]["additionalProperties"] = False
 
         return d
+
+
+class ProactivityMessage(BaseModelJSON):
+    message: str
+
+
+class ProactivityAction(Enum):
+    Nothing = auto()
+    FollowUp = auto()
+    Ping = auto()
+    DailyEvent = auto()
+
+
+class ProactivityState(BaseModelJSON):
+    last_user_ts: int
+    last_action: ProactivityAction
+    follow_up_count: int
+    daily_event_count: int
+    ping_count: int

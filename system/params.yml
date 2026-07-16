@@ -10,3 +10,8 @@ chat:
 analytics:
   provider: google
   model: gemini-3.1-flash-lite
+proactivity:
+  provider: google
+  model: gemini-3.1-flash-lite
+  params:
+    temperature: 1.3

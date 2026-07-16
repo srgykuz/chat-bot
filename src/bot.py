@@ -4,6 +4,9 @@ from typing import Dict, Any, Optional
 from time import time
 from datetime import timedelta
 
+import rq.job
+import rq.exceptions
+
 from src.llm import ModelClient, ModelResponse
 from src.session import SessionClient
 from src.weather import fetch_weather, fetch_weather_tool, WeatherInfo, FetchWeatherToolParams
@@ -11,6 +14,7 @@ from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_settings, get_queue
 from src.schema import Message, MessageRole, Persona, User, Tool
 from src import analytics
+from src import proactivity
 
 
 logger = logging.getLogger(__name__)
@@ -117,6 +121,7 @@ async def handle_command(message: TelegramMessage) -> None:
                 f"End: \"{history[-1].content}\""
             )
     elif command == "/clear":
+        enqueue_proactivity_clear(chat_id)
         session_client.clear(chat_id)
         response = "Session cleared."
     elif command == "/get_prompt":
@@ -173,6 +178,7 @@ async def handle_message(message: TelegramMessage) -> None:
 
     enqueue_flush_buffered_messages(chat_id, token)
     enqueue_analytics(chat_id)
+    enqueue_proactivity(chat_id)
 
     logger.info(
         "Buffered update %s from %s for chat %s",
@@ -186,7 +192,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
     """
     Handles a batch of messages that were queued using `handle_message()`.
     """
-    input = []
+    user_input = []
 
     for msg in messages:
         if msg.chat_id != chat_id:
@@ -195,15 +201,15 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         text = (msg.text or "").strip()
 
         if text:
-            input.append(text)
+            user_input.append(text)
 
-    if not input:
+    if not user_input:
         logger.info(f"No messages to process for chat {chat_id}")
         return
 
     history = session_client.get_history(chat_id)
 
-    for text in input:
+    for text in user_input:
         history.append(Message(role=MessageRole.USER, content=text))
 
     system_prompt = await build_system_prompt(chat_id)
@@ -220,17 +226,31 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         success = False
         logger.error("LLM call error: %s", e, exc_info=True)
 
+    await handle_response(
+        chat_id=chat_id,
+        user_input=user_input,
+        response=response,
+        success=success,
+    )
+
+
+async def handle_response(chat_id: int, user_input: list[str], response: ModelResponse, success: bool):
+    """
+    Sends model response back to the user in the given chat.
+
+    If success, user input and model output are saved in the storage.
+    """
     output = response.content.split(settings.output_separator)
     output = [s.strip() for s in output if s.strip()]
 
     if success:
-        for text in input:
+        for text in user_input:
             session_client.append_history(chat_id, Message(role=MessageRole.USER, content=text))
 
         for text in output:
             session_client.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=text))
 
-    logger.info(f"Responding to chat {chat_id} from {messages[-1].username}: {response}")
+    logger.info(f"Responding to chat {chat_id}: {response}")
 
     for text in output:
         await telegram_client.send_chat_action(chat_id, action="typing")
@@ -359,3 +379,55 @@ def enqueue_analytics(chat_id: int) -> None:
             analytics.analyze_chat_5m,
             chat_id,
         )
+
+
+def enqueue_proactivity(chat_id: int) -> None:
+    """
+    Enqueues proactivity function infinite loop.
+
+    To stop the loop, call `enqueue_proactivity_clear()`.
+    """
+    enqueue_proactivity_clear(chat_id)
+
+    queue.enqueue_in(
+        proactivity.interval,
+        enqueue_proactivity_loop,
+        chat_id,
+        job_id=f"enqueue_proactivity_loop_{chat_id}",
+        unique=True,
+    )
+
+
+def enqueue_proactivity_loop(chat_id: int) -> None:
+    """
+    Executes proactivity function and queues its next execution.
+    """
+    try:
+        proactivity.perform(chat_id)
+    except Exception as e:
+        logger.error(e)
+
+    queue.enqueue_in(
+        proactivity.interval,
+        enqueue_proactivity_loop,
+        chat_id,
+        job_id=f"proactivity_perform_{chat_id}",
+        unique=True,
+    )
+
+
+def enqueue_proactivity_clear(chat_id: int) -> None:
+    """
+    Removes jobs that were queued using `enqueue_proactivity()` and `enqueue_proactivity_loop()`.
+    """
+    try:
+        job = rq.job.Job.fetch(f"enqueue_proactivity_loop_{chat_id}", connection=queue.connection)
+        job.delete()
+    except rq.exceptions.NoSuchJobError:
+        pass
+
+    try:
+        job = rq.job.Job.fetch(f"proactivity_perform_{chat_id}", connection=queue.connection)
+        job.delete()
+    except rq.exceptions.NoSuchJobError:
+        pass
