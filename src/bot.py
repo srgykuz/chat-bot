@@ -12,7 +12,7 @@ from src.session import SessionClient
 from src.weather import fetch_weather, fetch_weather_tool, WeatherInfo, FetchWeatherToolParams
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_settings, get_queue
-from src.schema import Message, MessageRole, Persona, User, Tool
+from src.schema import Message, MessageRole, Persona, Tool
 from src import analytics
 from src import proactivity
 
