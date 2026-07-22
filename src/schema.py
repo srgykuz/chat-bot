@@ -167,3 +167,15 @@ class ProactivityState(BaseModelJSON):
     follow_up_count: int
     daily_event_count: int
     ping_count: int
+
+
+class Relationships(BaseModelJSON):
+    friendship: int = Field(..., ge=-100, le=100)
+    trust: int = Field(..., ge=-100, le=100)
+    romance: int = Field(..., ge=-100, le=100)
+
+
+class RelationshipsDelta(BaseModelJSON):
+    friendship_delta: int = Field(..., ge=-5, le=5)
+    trust_delta: int = Field(..., ge=-5, le=5)
+    romance_delta: int = Field(..., ge=-5, le=5)

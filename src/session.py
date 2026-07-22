@@ -9,7 +9,7 @@ from redis import Redis, WatchError
 
 from src.config import get_settings
 from src.telegram import TelegramMessage
-from src.schema import Persona, User, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary, ProactivityState
+from src.schema import Persona, User, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary, ProactivityState, Relationships
 
 
 class SessionClient:
@@ -46,6 +46,7 @@ class SessionClient:
         pipe.delete(self._emotional_state_key(chat_id))
         pipe.delete(self._conversation_summary_key(chat_id))
         pipe.delete(self._proactivity_state_key(chat_id))
+        pipe.delete(self._relationships_key(chat_id))
 
         pipe.execute()
 
@@ -120,6 +121,12 @@ class SessionClient:
         Returns the Redis key for storing conversation summaries for a specific chat.
         """
         return f"session:{chat_id}:conversation_summary"
+
+    def _relationships_key(self, chat_id: int) -> str:
+        """
+        Returns the Redis key for storing relationships for a specific chat.
+        """
+        return f"session:{chat_id}:relationships"
 
     def _user_key(self, chat_id: int) -> str:
         """
@@ -560,5 +567,26 @@ class SessionClient:
 
         if value:
             return ProactivityState.loads(value)
+
+        return None
+
+    def set_relationships(self, chat_id: int, relationships: Relationships) -> None:
+        """
+        Stores the current relationships state for the given chat ID.
+        """
+        key = self._relationships_key(chat_id)
+        value = relationships.dumps()
+
+        self.redis.set(key, value)
+
+    def get_relationships(self, chat_id: int) -> Optional[Relationships]:
+        """
+        Returns the current relationships state for the given chat ID, or None if not set.
+        """
+        key = self._relationships_key(chat_id)
+        value = cast(Optional[str], self.redis.get(key))
+
+        if value:
+            return Relationships.loads(value)
 
         return None

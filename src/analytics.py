@@ -7,7 +7,7 @@ import statistics
 from src.config import get_settings
 from src.session import SessionClient
 from src.llm import ModelClient
-from src.schema import Message, EmotionalState, EmotionalStateLLM, Facts, ConversationSummary, ConversationSummaryLLM
+from src.schema import Message, EmotionalState, EmotionalStateLLM, Facts, ConversationSummary, ConversationSummaryLLM, Relationships, RelationshipsDelta
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,7 @@ def analyze_chat_3m(chat_id: int) -> None:
         return
 
     infer_facts(chat_id, history)
+    infer_relationships(chat_id, history)
 
 
 def analyze_chat_5m(chat_id: int) -> None:
@@ -218,3 +219,52 @@ def infer_conversation_summary(chat_id: int, history: list[Message]) -> None:
     new_summary.timestamps = new_summary.timestamps[:settings.summaries_limit]
 
     session_client.set_conversation_summary(chat_id, new_summary)
+
+
+def infer_relationships(chat_id: int, history: list[Message]) -> None:
+    """
+    Changes current relationships based on the conversation tone and updates the storage.
+    """
+    system_prompt = (
+        "You are a backend analysis engine. Your task is to review the provided "
+        "conversation history between user and assistant and infer how the assistant's "
+        "relationship with the user should change as a result of this conversation. "
+        "Evaluate all dimensions independently: friendship, trust, and romance. "
+        "Use positive deltas when the conversation clearly strengthens that dimension, "
+        "negative deltas when it clearly weakens that dimension, and 0 when there is "
+        "not enough evidence for change. Use assistant messages only as context. Base your "
+        "judgment primarily on the user's reactions, tone, cooperation, warmth, openness, "
+        "appreciation, hostility, comfort, and boundaries shown in the conversation. "
+        "Do not infer romance increase from ordinary politeness or friendliness alone. "
+        "Do not punish brief misunderstandings unless they noticeably damage the interaction. "
+        "Keep changes conservative: use small adjustments for mild signals and stronger "
+        "adjustments only for clear repeated evidence. Return 0 for all fields if the "
+        "conversation is neutral, ambiguous, or too short to justify a meaningful update. "
+        "Consider the overall interaction trend, not any single line in isolation. "
+        "Output a JSON object that strictly matches the requested schema."
+    )
+    user_prompt = history_to_conversation(history[-15:])
+
+    result = asyncio.run(model_client.generate(
+        system_prompt,
+        user_prompt,
+        response_format=RelationshipsDelta,
+    ))
+    delta = RelationshipsDelta.loads(result.content)
+
+    current = session_client.get_relationships(chat_id)
+
+    if not current:
+        current = Relationships(
+            friendship=0,
+            trust=0,
+            romance=0,
+        )
+
+    updated = Relationships(
+        friendship=max(-100, min(100, current.friendship + delta.friendship_delta)),
+        trust=max(-100, min(100, current.trust + delta.trust_delta)),
+        romance=max(-100, min(100, current.romance + delta.romance_delta)),
+    )
+
+    session_client.set_relationships(chat_id, updated)
