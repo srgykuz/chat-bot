@@ -38,6 +38,7 @@ def perform(chat_id: int) -> None:
     """
     persona = session_client.get_persona(chat_id)
     user = session_client.get_user(chat_id)
+    relationships = session_client.get_relationships(chat_id)
     history = session_client.get_history(chat_id)
     last_user_ts = session_client.get_last_user_message_timestamp(chat_id)
     state = session_client.get_proactivity_state(chat_id)
@@ -47,6 +48,9 @@ def perform(chat_id: int) -> None:
         return
 
     if (persona.proactivity == 0) or (persona.now().hour >= 22 or persona.now().hour <= 6):
+        return
+
+    if relationships and relationships.friendship <= -25:
         return
 
     if (state is None) or (state.last_user_ts != last_user_ts):
@@ -65,6 +69,7 @@ def perform(chat_id: int) -> None:
         user_facts=None,
         user_emotional_state=None,
         conversation_summary=None,
+        relationships=relationships,
     )
     conversation = history_to_conversation(history)
 

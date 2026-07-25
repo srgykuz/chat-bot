@@ -16,7 +16,7 @@ import yaml
 
 from src.config import get_settings
 from src.weather import WeatherInfo
-from src.schema import Message, MessageRole, Persona, User, Facts, EmotionalState, ConversationSummary, Tool
+from src.schema import Message, MessageRole, Persona, User, Facts, EmotionalState, ConversationSummary, Relationships, Tool
 
 
 logger = logging.getLogger(__name__)
@@ -207,6 +207,7 @@ class ModelClient:
         user_facts: Optional[Facts] = None,
         user_emotional_state: Optional[EmotionalState] = None,
         conversation_summary: Optional[ConversationSummary] = None,
+        relationships: Optional[Relationships] = None,
     ) -> str:
         """
         Creates a system prompt by loading the template and filling all the
@@ -220,6 +221,7 @@ class ModelClient:
             user_facts=user_facts,
             user_emotional_state=user_emotional_state,
             conversation_summary=conversation_summary,
+            relationships=relationships,
         )
         context["persona_prompt"] = self.build_persona_prompt(
             persona,
@@ -228,6 +230,7 @@ class ModelClient:
             user_facts=user_facts,
             user_emotional_state=user_emotional_state,
             conversation_summary=conversation_summary,
+            relationships=relationships,
         )
         system_prompt = self.load_system_prompt()
 
@@ -241,6 +244,7 @@ class ModelClient:
         user_facts: Optional[Facts] = None,
         user_emotional_state: Optional[EmotionalState] = None,
         conversation_summary: Optional[ConversationSummary] = None,
+        relationships: Optional[Relationships] = None,
     ) -> str:
         """
         Creates a persona-only prompt by rendering the persona template.
@@ -252,6 +256,7 @@ class ModelClient:
             user_facts=user_facts,
             user_emotional_state=user_emotional_state,
             conversation_summary=conversation_summary,
+            relationships=relationships,
         )
 
         return jinja.from_string(persona.prompt).render(context)
@@ -264,6 +269,7 @@ class ModelClient:
         user_facts: Optional[Facts] = None,
         user_emotional_state: Optional[EmotionalState] = None,
         conversation_summary: Optional[ConversationSummary] = None,
+        relationships: Optional[Relationships] = None,
     ) -> Dict[str, Any]:
         """
         Creates prompt context that can be used to enrich prompt template.
@@ -290,6 +296,7 @@ class ModelClient:
             "persona_weekday": persona_weekday,
             "persona_weather": persona_weather,
             "conversation_summary": conversation_summary,
+            "relationships": relationships,
         }
 
         return context

@@ -172,7 +172,15 @@ async def handle_message(message: TelegramMessage) -> None:
     if not text:
         return
 
+    relationships = session_client.get_relationships(chat_id)
+
+    if relationships and relationships.friendship <= -50:
+        response = "*You have been blocked.*"
+        await telegram_client.send_message(chat_id=chat_id, text=response, escape=False)
+        return
+
     session_client.set_user(chat_id, message.user())
+
     token = session_client.buffer_message(chat_id, message)
     session_client.set_last_user_message_timestamp(chat_id, message.date or int(time()))
 
@@ -274,6 +282,7 @@ async def build_system_prompt(chat_id: int) -> str:
     user_facts = session_client.get_facts(chat_id)
     user_emotional_state = session_client.get_emotional_state(chat_id)
     conversation_summary = session_client.get_conversation_summary(chat_id)
+    relationships = session_client.get_relationships(chat_id)
     persona_weather: Optional[WeatherInfo] = None
 
     try:
@@ -288,6 +297,7 @@ async def build_system_prompt(chat_id: int) -> str:
         user_facts=user_facts,
         user_emotional_state=user_emotional_state,
         conversation_summary=conversation_summary,
+        relationships=relationships,
     )
 
     return system_prompt
