@@ -63,6 +63,7 @@ async def handle_command(message: TelegramMessage) -> None:
     response = ""
     file_content = ""
     file_name = ""
+    ts = int(time())
 
     if command == "/get_persona":
         persona = session_client.get_persona(chat_id)
@@ -120,13 +121,45 @@ async def handle_command(message: TelegramMessage) -> None:
                 f"Start: \"{history[0].content}\"\n"
                 f"End: \"{history[-1].content}\""
             )
+    elif command == "/get_facts":
+        facts = session_client.get_facts(chat_id)
+
+        if facts:
+            file_content = facts.model_dump_json(indent=2)
+            file_name = f"facts-{ts}.txt"
+        else:
+            response = "No facts are currently stored for this chat."
+    elif command == "/get_emotional_state":
+        emotional_state = session_client.get_emotional_state(chat_id)
+
+        if emotional_state:
+            file_content = emotional_state.model_dump_json(indent=2)
+            file_name = f"emotional_state-{ts}.txt"
+        else:
+            response = "No emotional state is currently stored for this chat."
+    elif command == "/get_conversation_summary":
+        conversation_summary = session_client.get_conversation_summary(chat_id)
+
+        if conversation_summary:
+            file_content = conversation_summary.model_dump_json(indent=2)
+            file_name = f"conversation_summary-{ts}.txt"
+        else:
+            response = "No conversation summary is currently stored for this chat."
+    elif command == "/get_relationships":
+        relationships = session_client.get_relationships(chat_id)
+
+        if relationships:
+            file_content = relationships.model_dump_json(indent=2)
+            file_name = f"relationships-{ts}.txt"
+        else:
+            response = "No relationships are currently stored for this chat."
     elif command == "/clear":
         enqueue_proactivity_clear(chat_id)
         session_client.clear(chat_id)
         response = "Session cleared."
     elif command == "/get_prompt":
         file_content = await build_system_prompt(chat_id)
-        file_name = f"prompt-{int(time())}.txt"
+        file_name = f"prompt-{ts}.txt"
     else:
         response = (
             "Persona commands:\n"
@@ -136,6 +169,10 @@ async def handle_command(message: TelegramMessage) -> None:
             "\n"
             "Prompt commands:\n"
             "/get\\_prompt\n"
+            "/get\\_facts\n"
+            "/get\\_emotional\\_state\n"
+            "/get\\_conversation\\_summary\n"
+            "/get\\_relationships\n"
             "/get\\_history\n"
             "\n"
             "Other commands:\n"
