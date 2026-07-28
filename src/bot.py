@@ -59,28 +59,25 @@ async def handle_command(message: TelegramMessage) -> None:
     chat_id = message.chat_id or 0
     text = (message.text or "").strip()
     command = text.split()[0].lower()
+    ts = int(time())
 
     response = ""
     file_content = ""
     file_name = ""
-    ts = int(time())
 
     if command == "/get_persona":
         persona = session_client.get_persona(chat_id)
 
         if persona:
-            response = (
-                "*Current persona:*\n"
-                f"ID: `{persona.id}`\n"
-                f"Name: `{persona.name}`\n"
-            )
+            dump = persona.model_dump_json(indent=2, exclude={"prompt"})
+            response = f"`{dump}`"
         else:
             response = "No persona is currently selected for this chat."
     elif command == "/set_persona":
         parts = text.split(maxsplit=1)
 
         if len(parts) < 2 or not parts[1].strip():
-            response = "Usage: /set\\_persona <id>"
+            response = "Usage: /set\\_persona `<id>`"
         else:
             persona_id = parts[1].strip()
             persona: Optional[Persona] = None
@@ -92,35 +89,25 @@ async def handle_command(message: TelegramMessage) -> None:
 
             if persona:
                 session_client.set_persona(chat_id, persona)
-                response = f"Persona set to {persona.id}."
+                response = f"Persona set to `{persona.id}`."
             else:
-                response = f"Persona {persona_id} not found."
+                response = f"Persona `{persona_id}` not found."
     elif command == "/list_persona":
         ids = [p.id for p in session_client.load_personas()]
 
         if ids:
             ids = [f"`{n}`" for n in ids]
-            response = "*Available personas:*\n" + "\n".join(ids)
+            response = "\n".join(ids)
         else:
             response = "No personas available."
     elif command == "/get_history":
-        info = session_client.get_history_info(chat_id)
         history = session_client.get_history(chat_id)
 
-        response = (
-            "*Chat history info:*\n"
-            f"Total messages: `{info.num_messages}`\n"
-            f"Max history stored: `{info.max_messages}`\n"
-            f"User messages: `{info.num_user_messages}`\n"
-            f"Assistant messages: `{info.num_assistant_messages}`"
-        )
-
         if history:
-            response += (
-                "\n"
-                f"Start: \"{history[0].content}\"\n"
-                f"End: \"{history[-1].content}\""
-            )
+            file_content = "\n".join([h.model_dump_json(indent=2) for h in history])
+            file_name = f"history-{ts}.txt"
+        else:
+            response = "No history is currently stored for this chat."
     elif command == "/get_facts":
         facts = session_client.get_facts(chat_id)
 
@@ -153,7 +140,7 @@ async def handle_command(message: TelegramMessage) -> None:
             file_name = f"relationships-{ts}.txt"
         else:
             response = "No relationships are currently stored for this chat."
-    elif command == "/clear":
+    elif command == "/clear_session":
         enqueue_proactivity_clear(chat_id)
         session_client.clear(chat_id)
         response = "Session cleared."
@@ -162,12 +149,12 @@ async def handle_command(message: TelegramMessage) -> None:
         file_name = f"prompt-{ts}.txt"
     else:
         response = (
-            "Persona commands:\n"
-            "/set\\_persona <id>\n"
+            "*Persona commands:*\n"
             "/get\\_persona\n"
+            "/set\\_persona `<id>`\n"
             "/list\\_persona\n"
             "\n"
-            "Prompt commands:\n"
+            "*Data commands:*\n"
             "/get\\_prompt\n"
             "/get\\_facts\n"
             "/get\\_emotional\\_state\n"
@@ -175,8 +162,8 @@ async def handle_command(message: TelegramMessage) -> None:
             "/get\\_relationships\n"
             "/get\\_history\n"
             "\n"
-            "Other commands:\n"
-            "/clear"
+            "*Session commands:*\n"
+            "/clear\\_session"
         )
 
     if response:
