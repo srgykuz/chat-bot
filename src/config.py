@@ -99,6 +99,7 @@ def configure_logger() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
+@lru_cache()
 def get_logger(name: str | None = None) -> logging.Logger:
     """Returns a logger with the specified name."""
 
