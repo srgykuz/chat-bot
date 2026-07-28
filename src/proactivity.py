@@ -7,7 +7,12 @@ from typing import Optional
 
 from src.session import SessionClient
 from src.llm import ModelClient, ModelResponse
-from src.schema import MessageRole, ProactivityMessage, ProactivityState, ProactivityAction
+from src.schema import (
+    MessageRole,
+    ProactivityMessage,
+    ProactivityState,
+    ProactivityAction,
+)
 from src.analytics import history_to_conversation
 
 

@@ -16,7 +16,17 @@ import yaml
 
 from src.config import get_settings
 from src.weather import WeatherInfo
-from src.schema import Message, MessageRole, Persona, User, Facts, EmotionalState, ConversationSummary, Relationships, Tool
+from src.schema import (
+    Message,
+    MessageRole,
+    Persona,
+    User,
+    Facts,
+    EmotionalState,
+    ConversationSummary,
+    Relationships,
+    Tool,
+)
 
 
 logger = logging.getLogger(__name__)

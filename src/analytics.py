@@ -7,7 +7,16 @@ import statistics
 from src.config import get_settings
 from src.session import SessionClient
 from src.llm import ModelClient
-from src.schema import Message, EmotionalState, EmotionalStateLLM, Facts, ConversationSummary, ConversationSummaryLLM, Relationships, RelationshipsDelta
+from src.schema import (
+    Message,
+    EmotionalState,
+    EmotionalStateLLM,
+    Facts,
+    ConversationSummary,
+    ConversationSummaryLLM,
+    Relationships,
+    RelationshipsDelta,
+)
 
 
 logger = logging.getLogger(__name__)

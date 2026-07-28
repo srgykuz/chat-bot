@@ -9,7 +9,18 @@ from redis import Redis, WatchError
 
 from src.config import get_settings
 from src.telegram import TelegramMessage
-from src.schema import Persona, User, Message, MessageRole, HistoryInfo, EmotionalState, Facts, ConversationSummary, ProactivityState, Relationships
+from src.schema import (
+    Persona,
+    User,
+    Message,
+    MessageRole,
+    HistoryInfo,
+    EmotionalState,
+    Facts,
+    ConversationSummary,
+    ProactivityState,
+    Relationships,
+)
 
 
 class SessionClient:
