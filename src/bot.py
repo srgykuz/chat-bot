@@ -206,9 +206,9 @@ async def handle_message(message: TelegramMessage) -> None:
         return
 
     session_client.set_user(chat_id, message.user())
+    session_client.set_last_user_message_timestamp(chat_id, message.date or int(time()))
 
     token = session_client.buffer_message(chat_id, message)
-    session_client.set_last_user_message_timestamp(chat_id, message.date or int(time()))
 
     enqueue_flush_buffered_messages(chat_id, token)
     enqueue_analytics(chat_id)
@@ -256,7 +256,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         response = await model_client.chat(system_prompt, history, tools=tools)
         success = True
     except Exception as e:
-        response = ModelResponse(content="🤖")
+        response = ModelResponse(content="Error. Try again later.")
         success = False
         logger.error("LLM call error: %s", e, exc_info=True)
 
