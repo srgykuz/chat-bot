@@ -1,3 +1,4 @@
+import logging
 from functools import lru_cache
 
 from pydantic import Field
@@ -85,6 +86,23 @@ class Settings(BaseSettings):
         default="[SPLIT]",
         description="Separator string to split LLM response into multiple messages.",
     )
+
+
+def configure_logger() -> None:
+    """Configures global logger settings. Should be called once at startup."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+
+    # do not log urls as they contain API keys
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def get_logger(name: str | None = None) -> logging.Logger:
+    """Returns a logger with the specified name."""
+
+    return logging.getLogger(name)
 
 
 @lru_cache()

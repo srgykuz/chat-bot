@@ -1,4 +1,3 @@
-import logging
 import asyncio
 import json
 from abc import ABC, abstractmethod
@@ -14,7 +13,7 @@ from jinja2 import Environment, StrictUndefined
 from pydantic import BaseModel, Field
 import yaml
 
-from src.config import get_settings
+from src.config import get_logger, get_settings
 from src.weather import WeatherInfo
 from src.schema import (
     Message,
@@ -29,7 +28,7 @@ from src.schema import (
 )
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 jinja = Environment(
     autoescape=False,
     undefined=StrictUndefined,

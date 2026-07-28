@@ -1,10 +1,10 @@
 import asyncio
-import logging
 import random
 from datetime import timedelta
 from time import time
 from typing import Optional
 
+from src.config import get_logger
 from src.session import SessionClient
 from src.llm import ModelClient, ModelResponse
 from src.schema import (
@@ -16,7 +16,7 @@ from src.schema import (
 from src.analytics import history_to_conversation
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 session_client = SessionClient()
 model_client = ModelClient("proactivity")
 

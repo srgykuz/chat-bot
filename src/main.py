@@ -1,24 +1,19 @@
 import asyncio
-import logging
 from typing import Dict, Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from src.config import get_settings, get_redis
+from src.config import configure_logger, get_logger, get_settings, get_redis
 from src.bot import handle_update, aclose as bot_aclose
 from src.telegram import TelegramPoller
 from src.analytics import close as analytics_close
 from src.proactivity import close as proactivity_close
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
+configure_logger()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 app = FastAPI(title="Chat Bot")
 settings = get_settings()
 

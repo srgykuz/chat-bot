@@ -1,10 +1,9 @@
 import asyncio
-import logging
 from datetime import timedelta
 from time import time
 import statistics
 
-from src.config import get_settings
+from src.config import get_logger, get_settings
 from src.session import SessionClient
 from src.llm import ModelClient
 from src.schema import (
@@ -19,7 +18,7 @@ from src.schema import (
 )
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 settings = get_settings()
 session_client = SessionClient()
 model_client = ModelClient("analytics")

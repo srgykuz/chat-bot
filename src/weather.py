@@ -1,16 +1,15 @@
 import asyncio
 import json
-import logging
 from dataclasses import dataclass, asdict
 from typing import cast, Any
 
 import httpx
 from pydantic import BaseModel, Field
 
-from src.config import get_settings, get_redis
+from src.config import get_logger, get_settings, get_redis
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 redis = get_redis()
 
 

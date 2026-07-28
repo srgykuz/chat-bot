@@ -1,17 +1,11 @@
-import logging
-
 from rq import Worker
 
-from src.config import get_redis, get_queue
+from src.config import configure_logger, get_logger, get_redis, get_queue
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
+configure_logger()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def main() -> None:

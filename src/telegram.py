@@ -1,16 +1,15 @@
 import io
 import asyncio
 from dataclasses import dataclass, asdict
-import logging
 from typing import Any, Callable, Coroutine, Dict, Optional
 
 import httpx
 
-from src.config import get_settings
+from src.config import get_logger, get_settings
 from src.schema import User
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)

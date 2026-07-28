@@ -1,4 +1,3 @@
-import logging
 import asyncio
 from typing import Dict, Any, Optional
 from time import time
@@ -11,13 +10,13 @@ from src.llm import ModelClient, ModelResponse
 from src.session import SessionClient
 from src.weather import fetch_weather, fetch_weather_tool, WeatherInfo, FetchWeatherToolParams
 from src.telegram import TelegramClient, TelegramMessage, parse_update
-from src.config import get_settings, get_queue
+from src.config import get_logger, get_settings, get_queue
 from src.schema import Message, MessageRole, Persona, Tool
 from src import analytics
 from src import proactivity
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 settings = get_settings()
 queue = get_queue()
 telegram_client = TelegramClient()
