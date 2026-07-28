@@ -738,6 +738,13 @@ class OllamaClient(ProviderClient):
         return result
 
 
+def history_to_conversation(history: list[Message]) -> str:
+    """
+    Converts chat history into format suitable for passing into LLM as a prompt.
+    """
+    return "\n".join([f"{msg.role.value.title()}: {msg.content}" for msg in history])
+
+
 if __name__ == "__main__":
     import asyncio
 

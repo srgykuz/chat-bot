@@ -5,7 +5,7 @@ import statistics
 
 from src.config import get_logger, get_settings
 from src.session import SessionClient
-from src.llm import ModelClient
+from src.llm import ModelClient, history_to_conversation
 from src.schema import (
     Message,
     EmotionalState,
@@ -83,13 +83,6 @@ def analyze_chat_5m(chat_id: int) -> None:
         return
 
     infer_conversation_summary(chat_id, history)
-
-
-def history_to_conversation(history: list[Message]) -> str:
-    """
-    Converts chat history into format suitable for LLM.
-    """
-    return "\n".join([f"{msg.role.value.title()}: {msg.content}" for msg in history])
 
 
 def infer_emotional_state(chat_id: int, history: list[Message]) -> None:

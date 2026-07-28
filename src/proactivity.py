@@ -6,14 +6,13 @@ from typing import Optional
 
 from src.config import get_logger
 from src.session import SessionClient
-from src.llm import ModelClient, ModelResponse
+from src.llm import ModelClient, ModelResponse, history_to_conversation
 from src.schema import (
     MessageRole,
     ProactivityMessage,
     ProactivityState,
     ProactivityAction,
 )
-from src.analytics import history_to_conversation
 
 
 logger = get_logger(__name__)
