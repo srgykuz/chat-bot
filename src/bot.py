@@ -147,6 +147,8 @@ async def handle_command(message: TelegramMessage) -> None:
     elif command == "/get_prompt":
         file_content = await build_system_prompt(chat_id)
         file_name = f"prompt-{ts}.txt"
+    elif command == "/get_chat_id":
+        response = f"`{chat_id}`"
     else:
         response = (
             "*Persona commands:*\n"
@@ -163,6 +165,7 @@ async def handle_command(message: TelegramMessage) -> None:
             "/get\\_history\n"
             "\n"
             "*Session commands:*\n"
+            "/get\\_chat\\_id\n"
             "/clear\\_session"
         )
 
