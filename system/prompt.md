@@ -54,8 +54,9 @@ Assistant: и че делать будешь?
 {% if persona_now %}
 Текущее время: {{ persona_now }}
 {% endif %}
-{% if persona_weekday %}
-Текущий день недели: {{ persona_weekday }}
+{% if persona_weekday is defined %}
+{% set weekdays = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"] %}
+Текущий день недели: {{ weekdays[persona_weekday] }}
 {% endif %}
 {% if persona_weather %}
 Текущая погода: {{ persona_weather.temp_c }}°C, {{ persona_weather.condition_text }}

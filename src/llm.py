@@ -289,15 +289,7 @@ class ModelClient:
         """
         persona_dt = persona.now()
         persona_now = persona_dt.strftime("%Y-%m-%d %H:%M:%S")
-        persona_weekday = [
-            "Понедельник",
-            "Вторник",
-            "Среда",
-            "Четверг",
-            "Пятница",
-            "Суббота",
-            "Воскресенье",
-        ][persona_dt.weekday()]
+        persona_weekday = persona_dt.weekday()
 
         context = {
             "settings": self.settings,
