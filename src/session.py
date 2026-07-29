@@ -13,8 +13,6 @@ from src.schema import (
     Persona,
     User,
     Message,
-    MessageRole,
-    HistoryInfo,
     EmotionalState,
     Facts,
     ConversationSummary,
@@ -25,9 +23,7 @@ from src.schema import (
 
 class SessionClient:
     """
-    Manages per-user and per-chat state: history, persona, etc.
-    A data in the state must not be considered as permanent as it
-    may be lost at any time. The state is stored in Redis.
+    Manages per-user and per-chat state: history, selected persona, etc.
     """
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -208,6 +204,15 @@ class SessionClient:
 
         return personas
 
+    def set_persona(self, chat_id: int, persona: Persona) -> None:
+        """
+        Sets the given persona for the specified chat ID.
+        """
+        key = self._persona_key(chat_id)
+        value = persona.id
+
+        self.redis.set(key, value)
+
     def get_persona(self, chat_id: int) -> Optional[Persona]:
         """
         Returns the currently set persona for the given chat ID, or None if no persona is set.
@@ -225,14 +230,6 @@ class SessionClient:
                 return persona
 
         return None
-
-    def set_persona(self, chat_id: int, persona: Persona) -> None:
-        """
-        Sets the given persona for the specified chat ID.
-        """
-        key = self._persona_key(chat_id)
-
-        self.redis.set(key, persona.id)
 
     def select_persona(self, persona_id: Optional[str] = None) -> Persona:
         """
@@ -298,6 +295,20 @@ class SessionClient:
 
         return None
 
+    def append_history(self, chat_id: int, message: Message) -> None:
+        """
+        Appends a message to the conversation history for the given chat ID.
+        The conversation history is trimmed to the maximum length defined in the settings.
+        """
+        key = self._history_key(chat_id)
+        value = message.dumps()
+        pipe = self.redis.pipeline()
+
+        pipe.rpush(key, value)
+        pipe.ltrim(key, -self.settings.history_limit, -1)
+
+        pipe.execute()
+
     def get_history(self, chat_id: int) -> List[Message]:
         """
         Returns the conversation history for the given chat ID.
@@ -316,27 +327,14 @@ class SessionClient:
 
         return history
 
-    def append_history(self, chat_id: int, message: Message) -> None:
-        """
-        Appends a message to the conversation history for the given chat ID.
-        The conversation history is trimmed to the maximum length defined in the settings.
-        """
-        key = self._history_key(chat_id)
-        value = message.dumps()
-        pipe = self.redis.pipeline()
-
-        pipe.rpush(key, value)
-        pipe.ltrim(key, -self.settings.history_limit, -1)
-
-        pipe.execute()
-
     def set_last_user_message_timestamp(self, chat_id: int, timestamp: int) -> None:
         """
         Stores the timestamp of the latest user message for the given chat ID.
         """
         key = self._last_user_message_timestamp_key(chat_id)
+        value = str(timestamp)
 
-        self.redis.set(key, str(timestamp))
+        self.redis.set(key, value)
 
     def get_last_user_message_timestamp(self, chat_id: int) -> Optional[int]:
         """
@@ -350,27 +348,12 @@ class SessionClient:
 
         return int(value)
 
-    def get_history_info(self, chat_id: int) -> HistoryInfo:
-        """
-        Returns meta information about the conversation history for the given chat ID.
-        """
-        history = self.get_history(chat_id)
-        num_user = sum(1 for msg in history if msg.role == MessageRole.USER)
-        num_assistant = sum(1 for msg in history if msg.role == MessageRole.ASSISTANT)
-
-        return HistoryInfo(
-            max_messages=self.settings.history_limit,
-            num_messages=len(history),
-            num_user_messages=num_user,
-            num_assistant_messages=num_assistant,
-        )
-
     def buffer_message(self, chat_id: int, message: TelegramMessage) -> str:
         """
         Stores a Telegram message in the per-chat buffer and refreshes its flush token.
 
         Returns new flush token which you should pass in flush_buffered_messages() to
-        pop all buffered messages.
+        pop all buffered messages. The token is used for optimistic locaking.
         """
         payload = json.dumps(message.to_dict(), ensure_ascii=False)
         pipe = self.redis.pipeline()
@@ -381,7 +364,6 @@ class SessionClient:
         result = pipe.execute()
         token = str(result[-1])
 
-        # Used for optimistic locking.
         return token
 
     def flush_buffered_messages(self, chat_id: int, flush_token: str) -> Optional[List[TelegramMessage]]:

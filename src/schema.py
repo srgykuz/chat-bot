@@ -47,13 +47,6 @@ class Message(BaseModelJSON):
     timestamp: float = Field(default_factory=time)
 
 
-class HistoryInfo(BaseModelJSON):
-    max_messages: int
-    num_messages: int
-    num_user_messages: int
-    num_assistant_messages: int
-
-
 class Mood(StrEnum):
     CHEERFUL = "cheerful"
     CALM = "calm"
