@@ -14,7 +14,7 @@ from src.proactivity import close as proactivity_close
 configure_logger()
 
 logger = get_logger(__name__)
-app = FastAPI(title="Chat Bot")
+app = FastAPI()
 settings = get_settings()
 
 app.state.poller = None
@@ -61,6 +61,7 @@ async def health() -> Dict[str, Any]:
 @app.post("/webhook")
 async def webhook(request: Request) -> JSONResponse:
     update = await request.json()
+
     await handle_update(update)
 
     return JSONResponse({"ok": True})
