@@ -298,7 +298,7 @@ def generate_continuation(persona_prompt: str, conversation: str) -> Proactivity
         "It should feel like the very next message in the same ongoing exchange. "
         "Output must strictly match the requested JSON schema."
         "\n\n"
-        "The message style should match your persona character and writing style:"
+        "The message style should match your persona character, writing style and language:"
         "\n\n"
         f"{persona_prompt}"
     )
