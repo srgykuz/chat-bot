@@ -6,10 +6,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import openai
-from google import genai
-from google.genai import types as genai_types
+import google.genai
 import ollama
-from jinja2 import Environment, StrictUndefined
+import jinja2
 from pydantic import BaseModel, Field
 import yaml
 
@@ -29,9 +28,9 @@ from src.schema import (
 
 
 logger = get_logger(__name__)
-jinja = Environment(
+jinja = jinja2.Environment(
     autoescape=False,
-    undefined=StrictUndefined,
+    undefined=jinja2.StrictUndefined,
     trim_blocks=True,
     lstrip_blocks=True,
 )
@@ -203,7 +202,12 @@ class ModelClient:
         context = [
             Message(role=MessageRole.SYSTEM, content=system_prompt)
         ] + conversation
-        response = await asyncio.to_thread(self.provider.chat, context, response_format, tools)
+        response = await asyncio.to_thread(
+            self.provider.chat,
+            context,
+            response_format,
+            tools,
+        )
         response.content = self.format_assistant_response(response.content)
 
         return response
@@ -394,6 +398,7 @@ class OpenAIClient(ProviderClient):
 
         params_log = dict(params)
         params_log.pop("input", None)
+
         logger.info(
             "OpenAI generate: model=%s params=%s usage=%s",
             getattr(response, "model", None),
@@ -489,7 +494,7 @@ class GoogleClient(ProviderClient):
         if not self.parent.settings.google_api_key:
             raise RuntimeError("Google API key is not configured.")
 
-        self.client = genai.Client(api_key=self.parent.settings.google_api_key)
+        self.client = google.genai.Client(api_key=self.parent.settings.google_api_key)
 
     def close(self) -> None:
         self.client.close()
@@ -507,7 +512,7 @@ class GoogleClient(ProviderClient):
             params["responseMimeType"] = "application/json"
             params["responseJsonSchema"] = response_format.model_json_schema()
 
-        generate_config = genai_types.GenerateContentConfig(
+        generate_config = google.genai.types.GenerateContentConfig(
             system_instruction=system_prompt,
             **params,
         )
@@ -545,9 +550,9 @@ class GoogleClient(ProviderClient):
                 system_prompt = msg.content
                 continue
             elif msg.role == MessageRole.USER:
-                content = genai_types.UserContent(parts=[genai_types.Part(text=msg.content)])
+                content = google.genai.types.UserContent(parts=[google.genai.types.Part(text=msg.content)])
             elif msg.role == MessageRole.ASSISTANT:
-                content = genai_types.ModelContent(parts=[genai_types.Part(text=msg.content)])
+                content = google.genai.types.ModelContent(parts=[google.genai.types.Part(text=msg.content)])
             else:
                 raise ValueError(f"Unknown message role: {msg.role}")
 
@@ -561,7 +566,7 @@ class GoogleClient(ProviderClient):
 
         last = history.pop()
 
-        if not isinstance(last, genai_types.UserContent):
+        if not isinstance(last, google.genai.types.UserContent):
             raise ValueError("Last message in context should be from user")
 
         curr_message = last.parts[0].text
@@ -577,7 +582,7 @@ class GoogleClient(ProviderClient):
         if tools:
             config.params["tools"] = [t.f for t in tools]
 
-        generate_config = genai_types.GenerateContentConfig(
+        generate_config = google.genai.types.GenerateContentConfig(
             system_instruction=system_prompt,
             **config.params,
         )
@@ -746,8 +751,6 @@ def history_to_conversation(history: list[Message]) -> str:
 
 
 if __name__ == "__main__":
-    import asyncio
-
     class CalendarEvent(BaseModel):
         name: str
         date: str
