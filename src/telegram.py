@@ -62,16 +62,16 @@ def parse_update(update: Dict[str, Any]) -> Optional[TelegramMessage]:
         return None
 
     chat = message.get("chat", {})
-    fromm = message.get("from", {})
+    from_ = message.get("from", {})
 
     return TelegramMessage(
         update_id=update.get("update_id"),
         message_id=message.get("message_id"),
         chat_id=chat.get("id"),
-        user_id=fromm.get("id"),
-        username=fromm.get("username"),
-        first_name=fromm.get("first_name"),
-        last_name=fromm.get("last_name"),
+        user_id=from_.get("id"),
+        username=from_.get("username"),
+        first_name=from_.get("first_name"),
+        last_name=from_.get("last_name"),
         text=message.get("text"),
         date=message.get("date"),
     )
@@ -118,15 +118,6 @@ class TelegramClient:
             response_text,
             exc_info=True,
         )
-
-    def _escape_markdown(self, text: str) -> str:
-        """
-        Escape Markdown special characters supported by Telegram.
-        """
-        for char in ("_", "*", "`", "["):
-            text = text.replace(char, f"\\{char}")
-
-        return text
 
     async def _request_json(
         self,
@@ -175,7 +166,7 @@ class TelegramClient:
         chat_id: int,
         text: str,
         reply_to_message_id: Optional[int] = None,
-        escape: bool = True,
+        mode_markdown: bool = False,
     ) -> Dict[str, Any]:
         """
         Send a message to a Telegram chat.
@@ -184,22 +175,21 @@ class TelegramClient:
             chat_id: Telegram chat ID
             text: Message text
             reply_to_message_id: Optional message ID to reply to
-            escape: Whether to escape Markdown special characters
+            mode_markdown: Whether to use Markdown parsing
 
         Returns:
             API response
         """
-        if escape:
-            text = self._escape_markdown(text)
-
         payload = {
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": "Markdown",
         }
 
         if reply_to_message_id:
             payload["reply_to_message_id"] = reply_to_message_id
+
+        if mode_markdown:
+            payload["parse_mode"] = "Markdown"
 
         return await self._request_json("POST", "sendMessage", payload=payload)
 

@@ -173,7 +173,7 @@ async def handle_command(message: TelegramMessage) -> None:
             chat_id=chat_id,
             text=response,
             reply_to_message_id=message.message_id,
-            escape=False
+            mode_markdown=True,
         )
     elif file_content:
         await telegram_client.send_document(
@@ -202,7 +202,7 @@ async def handle_message(message: TelegramMessage) -> None:
 
     if relationships and relationships.friendship <= -50:
         response = "*You have been blocked.*"
-        await telegram_client.send_message(chat_id=chat_id, text=response, escape=False)
+        await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
         return
 
     session_client.set_user(chat_id, message.user())
