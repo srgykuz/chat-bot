@@ -42,10 +42,10 @@ class WeatherInfo:
 
 async def fetch_weather(city: str, lang: str = "", use_cache: bool = True) -> WeatherInfo:
     """
-    Fetches current weather information for a given city using API.
+    Fetches current weather information for a given city.
 
-    lang can be a language code (e.g. "de"), empty string means English.
-    If use_cache is True, the function will cache a result.
+    lang can be a language code (e.g. `"de"`), empty string means English.
+    If `use_cache` is `True`, the result will be cached.
     """
     city = (city or "").strip()
 
@@ -55,7 +55,7 @@ async def fetch_weather(city: str, lang: str = "", use_cache: bool = True) -> We
     settings = get_settings()
 
     if not settings.weatherapi_api_key:
-        raise RuntimeError("WeatherAPI API key is not configured")
+        raise RuntimeError("Weather API key is not configured")
 
     cache_key = f"weather:{city.casefold()}:{lang.casefold()}"
 
@@ -139,8 +139,6 @@ def fetch_weather_tool(city: str) -> str:
 
 
 if __name__ == "__main__":
-    import asyncio
-
     city = "Tokyo"
     info = asyncio.run(fetch_weather(city, use_cache=False))
     data = info.to_dict()
