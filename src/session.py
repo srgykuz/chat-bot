@@ -591,3 +591,16 @@ class SessionClient:
             return Relationships.loads(value)
 
         return None
+
+
+def validate_personas():
+    """
+    Loads all personas from the catalog and validates them.
+    Raises an exception if any persona is invalid.
+    """
+    client = SessionClient()
+
+    try:
+        client.load_personas()
+    finally:
+        client.close()

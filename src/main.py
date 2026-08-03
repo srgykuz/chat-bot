@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from src.config import configure_logger, get_logger, get_settings, get_redis
 from src.bot import handle_update, aclose as bot_aclose
 from src.telegram import TelegramPoller
+from src.session import validate_personas
 from src.analytics import close as analytics_close
 from src.proactivity import close as proactivity_close
 
@@ -23,6 +24,8 @@ app.state.poller_task = None
 
 @app.on_event("startup")
 async def on_startup():
+    validate_personas()
+
     if settings.telegram_use_polling:
         logger.info("Starting Telegram long polling")
         app.state.poller = TelegramPoller(handle_update)
