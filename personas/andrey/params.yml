@@ -3,6 +3,6 @@ name: Андрей
 timezone: Asia/Novosibirsk
 city: Новосибирск
 language: ru
-proactivity: 0.3
+proactivity_factor: 0.3
 proactivity_friendship: -25
 block_friendship: -60

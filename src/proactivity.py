@@ -51,7 +51,7 @@ def perform(chat_id: int) -> None:
         logger.info("Chat state is not initialized")
         return
 
-    if (persona.proactivity == 0) or (persona.now().hour >= 22 or persona.now().hour <= 6):
+    if (persona.proactivity_factor == 0) or (persona.now().hour >= 22 or persona.now().hour <= 6):
         return
 
     if relationships and relationships.friendship <= persona.proactivity_friendship:
@@ -88,13 +88,13 @@ def perform(chat_id: int) -> None:
         if state.follow_up_count >= 3:
             pass
         elif state.last_action == ProactivityAction.FollowUp or history[-1].role == MessageRole.USER:
-            if persona.proactivity >= random.random():
+            if persona.proactivity_factor >= random.random():
                 result = generate_continuation(persona_prompt, conversation)
                 state.follow_up_count += 1
             else:
                 pass
         else:
-            if persona.proactivity >= random.random():
+            if persona.proactivity_factor >= random.random():
                 result = generate_follow_up(persona_prompt, conversation)
                 state.last_action = ProactivityAction.FollowUp
                 state.follow_up_count += 1
@@ -104,13 +104,13 @@ def perform(chat_id: int) -> None:
         if state.daily_event_count >= 2:
             pass
         elif state.last_action == ProactivityAction.DailyEvent:
-            if persona.proactivity >= random.random():
+            if persona.proactivity_factor >= random.random():
                 result = generate_continuation(persona_prompt, conversation)
                 state.daily_event_count += 1
             else:
                 pass
         else:
-            if persona.proactivity >= random.random():
+            if persona.proactivity_factor >= random.random():
                 result = generate_daily_event(persona_prompt)
                 state.last_action = ProactivityAction.DailyEvent
                 state.daily_event_count += 1
@@ -120,7 +120,7 @@ def perform(chat_id: int) -> None:
         if state.ping_count >= 1:
             pass
         else:
-            if persona.proactivity >= random.random():
+            if persona.proactivity_factor >= random.random():
                 result = generate_ping(persona_prompt, conversation)
                 state.last_action = ProactivityAction.Ping
                 state.ping_count += 1

@@ -175,7 +175,7 @@ class SessionClient:
             timezone = str(params.get("timezone", None) or "").strip()
             city = str(params.get("city", None) or "").strip()
             language = str(params.get("language", None) or "").strip()
-            proactivity = params.get("proactivity", 0.0)
+            proactivity_factor = params.get("proactivity_factor", 0.0)
             proactivity_friendship = params.get("proactivity_friendship", -25)
             block_friendship = params.get("block_friendship", -50)
 
@@ -195,7 +195,7 @@ class SessionClient:
                 timezone=timezone,
                 city=city,
                 language=language,
-                proactivity=proactivity,
+                proactivity_factor=proactivity_factor,
                 proactivity_friendship=proactivity_friendship,
                 block_friendship=block_friendship,
                 prompt=prompt,
