@@ -9,16 +9,22 @@ from pydantic import BaseModel, Field
 
 class BaseModelJSON(BaseModel):
     def dumps(self) -> str:
+        """
+        Dumps the model to a JSON string.
+        """
         return self.model_dump_json()
 
     @classmethod
     def loads(cls, s: str) -> Self:
+        """
+        Loads the model from a JSON string and validates it.
+        """
         return cls.model_validate_json(s)
 
 
 class User(BaseModelJSON):
     first_name: str
-    last_name: str = Field(default="")
+    last_name: str
 
 
 class Persona(BaseModelJSON):
@@ -35,9 +41,15 @@ class Persona(BaseModelJSON):
     prompt: str
 
     def now(self) -> datetime:
+        """
+        Returns current time in the persona's timezone.
+        """
         return datetime.now(tz=ZoneInfo(self.timezone))
 
     def is_sleeping(self) -> bool:
+        """
+        Returns if the persona is currently sleeping.
+        """
         from_ = self.sleep_from
         to_ = self.sleep_to
         hour = self.now().hour
@@ -143,6 +155,9 @@ class Tool(BaseModel):
         return self.f.__name__
 
     def definition(self, strict: bool = False) -> dict[str, Any]:
+        """
+        Returns the tool definition suitable for passing into LLM function call.
+        """
         d: dict[str, Any] = {
             "name": self.f.__name__,
             "description": (self.f.__doc__ or "").strip("\n"),
