@@ -1,7 +1,6 @@
 id: andrey
-name: Андрей
 timezone: Asia/Novosibirsk
-city: Новосибирск
+city: Novosibirsk
 language: ru
 sleep_from: 22
 sleep_to: 6

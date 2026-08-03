@@ -171,7 +171,6 @@ class SessionClient:
                 raise RuntimeError(f"Persona params file must contain a YAML object: {params_path}")
 
             id = str(params.get("id", None) or "").strip()
-            name = str(params.get("name", None) or "").strip()
             timezone = str(params.get("timezone", None) or "").strip()
             city = str(params.get("city", None) or "").strip()
             language = str(params.get("language", None) or "").strip()
@@ -194,7 +193,6 @@ class SessionClient:
 
             persona = Persona(
                 id=id,
-                name=name,
                 timezone=timezone,
                 city=city,
                 language=language,

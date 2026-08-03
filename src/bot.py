@@ -201,7 +201,7 @@ async def handle_message(message: TelegramMessage) -> None:
     persona = session_client.get_persona(chat_id)
     relationships = session_client.get_relationships(chat_id)
 
-    if persona and relationships and relationships.friendship <= persona.block_friendship:
+    if persona and relationships and relationships.friendship < persona.block_friendship:
         response = "*You have been blocked.*"
         await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
         return

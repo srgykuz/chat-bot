@@ -54,7 +54,7 @@ def perform(chat_id: int) -> None:
     if (persona.proactivity_factor == 0) or persona.is_sleeping():
         return
 
-    if relationships and relationships.friendship <= persona.proactivity_friendship:
+    if relationships and relationships.friendship < persona.proactivity_friendship:
         return
 
     if (state is None) or (state.last_user_ts != last_user_ts):

@@ -23,7 +23,6 @@ class User(BaseModelJSON):
 
 class Persona(BaseModelJSON):
     id: str
-    name: str
     timezone: str
     city: str
     language: str
@@ -43,7 +42,10 @@ class Persona(BaseModelJSON):
         to_ = self.sleep_to
         hour = self.now().hour
 
-        if from_ <= to_:
+        if from_ == to_:
+            return False
+
+        if from_ < to_:
             return from_ <= hour <= to_
 
         return (hour >= from_) or (hour <= to_)

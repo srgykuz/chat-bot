@@ -1,7 +1,6 @@
 id: lera
-name: Лера
 timezone: Europe/Moscow
-city: Москва
+city: Moscow
 language: ru
 sleep_from: 23
 sleep_to: 8
