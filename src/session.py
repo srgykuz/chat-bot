@@ -170,16 +170,16 @@ class SessionClient:
             if not isinstance(params, dict):
                 raise RuntimeError(f"Persona params file must contain a YAML object: {params_path}")
 
-            id = str(params.get("id", None) or "").strip()
-            timezone = str(params.get("timezone", None) or "").strip()
-            city = str(params.get("city", None) or "").strip()
-            language = str(params.get("language", None) or "").strip()
-            sleep_from = params.get("sleep_from", 22)
-            sleep_to = params.get("sleep_to", 6)
-            typing_speed = params.get("typing_speed", 15)
-            proactivity_factor = params.get("proactivity_factor", 0.0)
-            proactivity_friendship = params.get("proactivity_friendship", -25)
-            block_friendship = params.get("block_friendship", -50)
+            id = params.get("id", ...)
+            timezone = params.get("timezone", ...)
+            city = params.get("city", ...)
+            language = params.get("language", ...)
+            sleep_from = params.get("sleep_from", ...)
+            sleep_to = params.get("sleep_to", ...)
+            typing_speed = params.get("typing_speed", ...)
+            proactivity_factor = params.get("proactivity_factor", ...)
+            proactivity_friendship = params.get("proactivity_friendship", ...)
+            block_friendship = params.get("block_friendship", ...)
 
             prompt_path = persona_dir / "prompt.md"
 
