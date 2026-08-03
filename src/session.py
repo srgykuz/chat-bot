@@ -170,17 +170,6 @@ class SessionClient:
             if not isinstance(params, dict):
                 raise RuntimeError(f"Persona params file must contain a YAML object: {params_path}")
 
-            id = params.get("id", ...)
-            timezone = params.get("timezone", ...)
-            city = params.get("city", ...)
-            language = params.get("language", ...)
-            sleep_from = params.get("sleep_from", ...)
-            sleep_to = params.get("sleep_to", ...)
-            typing_speed = params.get("typing_speed", ...)
-            proactivity_factor = params.get("proactivity_factor", ...)
-            proactivity_friendship = params.get("proactivity_friendship", ...)
-            block_friendship = params.get("block_friendship", ...)
-
             prompt_path = persona_dir / "prompt.md"
 
             if not prompt_path.exists() or not prompt_path.is_file():
@@ -191,20 +180,7 @@ class SessionClient:
             if not prompt:
                 continue
 
-            persona = Persona(
-                id=id,
-                timezone=timezone,
-                city=city,
-                language=language,
-                sleep_from=sleep_from,
-                sleep_to=sleep_to,
-                typing_speed=typing_speed,
-                proactivity_factor=proactivity_factor,
-                proactivity_friendship=proactivity_friendship,
-                block_friendship=block_friendship,
-                prompt=prompt,
-            )
-
+            persona = Persona(**params, prompt=prompt)
             personas.append(persona)
 
         if not personas:
