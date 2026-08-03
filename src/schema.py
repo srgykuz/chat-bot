@@ -27,6 +27,9 @@ class Persona(BaseModelJSON):
     timezone: str
     city: str
     language: str
+    sleep_from: int = Field(..., ge=0, le=23)
+    sleep_to: int = Field(..., ge=0, le=23)
+    typing_speed: int = Field(..., ge=0, le=100)
     proactivity_factor: float = Field(..., ge=0.0, le=1.0)
     proactivity_friendship: int = Field(..., ge=-100, le=100)
     block_friendship: int = Field(..., ge=-100, le=100)
@@ -34,6 +37,16 @@ class Persona(BaseModelJSON):
 
     def now(self) -> datetime:
         return datetime.now(tz=ZoneInfo(self.timezone))
+
+    def is_sleeping(self) -> bool:
+        from_ = self.sleep_from
+        to_ = self.sleep_to
+        hour = self.now().hour
+
+        if from_ <= to_:
+            return from_ <= hour <= to_
+
+        return (hour >= from_) or (hour <= to_)
 
 
 class MessageRole(StrEnum):

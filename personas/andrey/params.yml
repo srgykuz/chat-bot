@@ -3,6 +3,9 @@ name: Андрей
 timezone: Asia/Novosibirsk
 city: Новосибирск
 language: ru
+sleep_from: 22
+sleep_to: 6
+typing_speed: 15
 proactivity_factor: 0.3
 proactivity_friendship: -25
 block_friendship: -60

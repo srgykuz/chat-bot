@@ -175,6 +175,9 @@ class SessionClient:
             timezone = str(params.get("timezone", None) or "").strip()
             city = str(params.get("city", None) or "").strip()
             language = str(params.get("language", None) or "").strip()
+            sleep_from = params.get("sleep_from", 22)
+            sleep_to = params.get("sleep_to", 6)
+            typing_speed = params.get("typing_speed", 15)
             proactivity_factor = params.get("proactivity_factor", 0.0)
             proactivity_friendship = params.get("proactivity_friendship", -25)
             block_friendship = params.get("block_friendship", -50)
@@ -195,6 +198,9 @@ class SessionClient:
                 timezone=timezone,
                 city=city,
                 language=language,
+                sleep_from=sleep_from,
+                sleep_to=sleep_to,
+                typing_speed=typing_speed,
                 proactivity_factor=proactivity_factor,
                 proactivity_friendship=proactivity_friendship,
                 block_friendship=block_friendship,

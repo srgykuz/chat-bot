@@ -51,7 +51,7 @@ def perform(chat_id: int) -> None:
         logger.info("Chat state is not initialized")
         return
 
-    if (persona.proactivity_factor == 0) or (persona.now().hour >= 22 or persona.now().hour <= 6):
+    if (persona.proactivity_factor == 0) or persona.is_sleeping():
         return
 
     if relationships and relationships.friendship <= persona.proactivity_friendship:

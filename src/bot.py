@@ -275,6 +275,11 @@ async def handle_response(chat_id: int, user_input: list[str], response: ModelRe
 
     If success, user input and model output are saved in the storage.
     """
+    persona = session_client.get_persona(chat_id)
+
+    if not persona:
+        raise Exception("Persona is not set.")
+
     output = response.content.split(settings.output_separator)
     output = [s.strip() for s in output if s.strip()]
 
@@ -290,7 +295,7 @@ async def handle_response(chat_id: int, user_input: list[str], response: ModelRe
     for text in output:
         await telegram_client.send_chat_action(chat_id, action="typing")
 
-        delay = calc_typing_duration(text)
+        delay = calc_typing_duration(text, persona.typing_speed)
         await asyncio.sleep(delay)
 
         await telegram_client.send_message(chat_id=chat_id, text=text)
@@ -342,11 +347,12 @@ def build_tools() -> list[Tool]:
     ]
 
 
-def calc_typing_duration(text: str) -> float:
+def calc_typing_duration(text: str, chars_per_second: int = 15) -> float:
     """
     Returns number of seconds to simulate human typing duration for a given text.
     """
-    chars_per_second = 15
+    if chars_per_second <= 0:
+        return 0.0
 
     return len(text) / chars_per_second
 
