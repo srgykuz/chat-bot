@@ -4,3 +4,5 @@ timezone: Europe/Moscow
 city: Москва
 language: ru
 proactivity: 0.6
+proactivity_friendship: -25
+block_friendship: -40

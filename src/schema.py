@@ -28,6 +28,8 @@ class Persona(BaseModelJSON):
     city: str
     language: str
     proactivity: float = Field(..., ge=0.0, le=1.0)
+    proactivity_friendship: int = Field(..., ge=-100, le=100)
+    block_friendship: int = Field(..., ge=-100, le=100)
     prompt: str
 
     def now(self) -> datetime:
