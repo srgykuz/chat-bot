@@ -63,8 +63,17 @@ async def health() -> Dict[str, Any]:
 
 @app.post("/webhook")
 async def webhook(request: Request) -> JSONResponse:
+    if settings.telegram_webhook_secret_token:
+        secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+
+        if secret_token != settings.telegram_webhook_secret_token:
+            return JSONResponse({"ok": False}, status_code=401)
+
     update = await request.json()
 
-    await handle_update(update)
+    try:
+        await handle_update(update)
+    except Exception as e:
+        logger.error(f"Error handling webhook update: {e}", exc_info=True)
 
     return JSONResponse({"ok": True})

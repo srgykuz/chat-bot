@@ -232,13 +232,29 @@ class TelegramClient:
 
         return await self._request_json("POST", "sendChatAction", payload=payload)
 
-    async def set_webhook(self, url: str) -> Dict[str, Any]:
+    async def set_webhook(self, url: str, secret_token: str | None = None) -> Dict[str, Any]:
         """
         Set webhook URL for receiving updates.
         """
-        payload = {"url": url}
+        payload = {
+            "url": url,
+            "drop_pending_updates": True,
+        }
+
+        if secret_token:
+            payload["secret_token"] = secret_token
 
         return await self._request_json("POST", "setWebhook", payload=payload)
+
+    async def delete_webhook(self) -> Dict[str, Any]:
+        """
+        Delete the current webhook and switch the bot back to getUpdates polling.
+        """
+        payload = {
+            "drop_pending_updates": True,
+        }
+
+        return await self._request_json("POST", "deleteWebhook", payload=payload)
 
     async def get_webhook_info(self) -> Dict[str, Any]:
         """

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
         default=False,
         description="Use long polling to receive updates instead of expecting webhook endpoint call.",
     )
+    telegram_webhook_secret_token: str = Field(
+        default="",
+        description="Secret token used to authenticate Telegram webhook requests.",
+    )
 
     google_api_key: str = Field(
         default="",
