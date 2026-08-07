@@ -37,6 +37,13 @@ jinja = jinja2.Environment(
 )
 
 
+class ModelLimitReachedError(Exception):
+    """
+    Raised when a ModelClient usage has reached any of the limits defined in its config.
+    """
+    pass
+
+
 @dataclass(slots=True)
 class ModelResponse:
     """
@@ -44,57 +51,6 @@ class ModelResponse:
     """
     content: str
     usage_total_tokens: int
-
-
-class ProviderClient(ABC):
-    """
-    Base class that should be implemented by provider-specific LLM client.
-    """
-    def __init__(self, parent: "ModelClient") -> None:
-        self.parent = parent
-
-    @abstractmethod
-    def close(self) -> None:
-        """
-        Closes an underlying resources.
-        """
-        pass
-
-    @abstractmethod
-    def generate(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        response_format: Optional[type[BaseModel]] = None,
-    ) -> ModelResponse:
-        """
-        Generates a response for a single-turn prompt.
-
-        The prompt consist of a system instruction and a single user message
-        the model should respond to.
-
-        Response is a generated assistant message text. If response_format is provided,
-        content is a JSON string.
-        """
-        pass
-
-    @abstractmethod
-    def chat(
-        self,
-        context: List[Message],
-        response_format: Optional[type[BaseModel]] = None,
-        tools: Optional[List[Tool]] = None,
-    ) -> ModelResponse:
-        """
-        Generates a response for the supplied chat context.
-
-        The context consist of system prompt, past user and assistant messages,
-        and user's current message the model should respond to.
-
-        Response is a generated assistant message text. If response_format is provided,
-        content is a JSON string.
-        """
-        pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,11 +79,57 @@ class ModelConfig:
         return bool(self.provider and self.model and self.limits.is_valid())
 
 
-class ModelLimitReachedError(Exception):
+class ProviderClient(ABC):
     """
-    Raised when a ModelClient usage has reached any of the limits defined in its config.
+    Base class that should be implemented by provider-specific LLM client.
     """
-    pass
+    def __init__(self, parent: "ModelClient") -> None:
+        self.parent = parent
+
+    @abstractmethod
+    def close(self) -> None:
+        """
+        Closes an underlying resources.
+        """
+        pass
+
+    @abstractmethod
+    def generate(
+        self,
+        config: ModelConfig,
+        system_prompt: str,
+        user_prompt: str,
+        response_format: Optional[type[BaseModel]] = None,
+    ) -> ModelResponse:
+        """
+        Generates a response for a single-turn prompt.
+
+        The prompt consist of a system instruction and a single user message
+        the model should respond to.
+
+        Response is a generated assistant message text. If response_format is provided,
+        content is a JSON string.
+        """
+        pass
+
+    @abstractmethod
+    def chat(
+        self,
+        config: ModelConfig,
+        context: List[Message],
+        response_format: Optional[type[BaseModel]] = None,
+        tools: Optional[List[Tool]] = None,
+    ) -> ModelResponse:
+        """
+        Generates a response for the supplied chat context.
+
+        The context consist of system prompt, past user and assistant messages,
+        and user's current message the model should respond to.
+
+        Response is a generated assistant message text. If response_format is provided,
+        content is a JSON string.
+        """
+        pass
 
 
 class ModelClient:
@@ -195,6 +197,7 @@ class ModelClient:
 
         response = await asyncio.to_thread(
             self.provider.generate,
+            config,
             system_prompt,
             user_prompt,
             response_format,
@@ -247,6 +250,7 @@ class ModelClient:
         ] + conversation
         response = await asyncio.to_thread(
             self.provider.chat,
+            config,
             context,
             response_format,
             tools,
@@ -420,11 +424,11 @@ class OpenAIClient(ProviderClient):
 
     def generate(
         self,
+        config: ModelConfig,
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.name)
         params = dict(config.params)
 
         params["model"] = config.model
@@ -457,24 +461,25 @@ class OpenAIClient(ProviderClient):
 
     def chat(
         self,
+        config: ModelConfig,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
         tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.name)
-
         messages: List[dict[str, Any]] = [
             {"role": msg.role.value, "content": msg.content}
             for msg in context
         ]
-        config.params["messages"] = messages
-        config.params["model"] = config.model
+
+        params = dict(config.params)
+        params["model"] = config.model
+        params["messages"] = messages
 
         if response_format:
-            config.params["response_format"] = response_format
+            params["response_format"] = response_format
 
         if tools:
-            config.params["tools"] = [
+            params["tools"] = [
                 {"type": "function", "function": t.definition(strict=True)}
                 for t in tools
             ]
@@ -487,7 +492,7 @@ class OpenAIClient(ProviderClient):
             if count >= 10:
                 raise RuntimeError("Infinite loop protection.")
 
-            response = self.client.chat.completions.parse(**config.params)
+            response = self.client.chat.completions.parse(**params)
             count += 1
             message = response.choices[0].message
 
@@ -553,11 +558,11 @@ class GoogleClient(ProviderClient):
 
     def generate(
         self,
+        config: ModelConfig,
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.name)
         params = dict(config.params)
 
         if response_format:
@@ -592,6 +597,7 @@ class GoogleClient(ProviderClient):
 
     def chat(
         self,
+        config: ModelConfig,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
         tools: Optional[List[Tool]] = None,
@@ -626,21 +632,22 @@ class GoogleClient(ProviderClient):
             raise ValueError("Last message in context should be from user")
 
         curr_message = last.parts[0].text
-        config = self.parent.load_config(self.parent.name)
 
         if response_format and tools and ("gemini-2" in config.model):
             raise RuntimeError("Function calling with Structured output is available only for Gemini 3 models.")
 
+        params = dict(config.params)
+
         if response_format:
-            config.params["responseMimeType"] = "application/json"
-            config.params["responseJsonSchema"] = response_format.model_json_schema()
+            params["responseMimeType"] = "application/json"
+            params["responseJsonSchema"] = response_format.model_json_schema()
 
         if tools:
-            config.params["tools"] = [t.f for t in tools]
+            params["tools"] = [t.f for t in tools]
 
         generate_config = google.genai.types.GenerateContentConfig(
             system_instruction=system_prompt,
-            **config.params,
+            **params,
         )
         chat = self.client.chats.create(
             model=config.model,
@@ -660,7 +667,7 @@ class GoogleClient(ProviderClient):
         logger.info(
             "Google chat: model=%s params=%s usage=%s",
             getattr(response, "model_version", None),
-            config.params,
+            params,
             getattr(response, "usage_metadata", None),
         )
 
@@ -686,11 +693,11 @@ class OllamaClient(ProviderClient):
 
     def generate(
         self,
+        config: ModelConfig,
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.name)
         params = dict(config.params)
 
         if response_format:
@@ -727,21 +734,22 @@ class OllamaClient(ProviderClient):
 
     def chat(
         self,
+        config: ModelConfig,
         context: List[Message],
         response_format: Optional[type[BaseModel]] = None,
         tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.name)
         messages = [
             ollama.Message(role=msg.role.value, content=msg.content)
             for msg in context
         ]
+        params = dict(config.params)
 
         if response_format:
-            config.params["format"] = response_format.model_json_schema()
+            params["format"] = response_format.model_json_schema()
 
         if tools:
-            config.params["tools"] = [t.f for t in tools]
+            params["tools"] = [t.f for t in tools]
 
         response: Optional[ollama.ChatResponse] = None
         count = 0
@@ -750,7 +758,7 @@ class OllamaClient(ProviderClient):
             if count >= 10:
                 raise RuntimeError("Infinite loop protection.")
 
-            response = self.client.chat(model=config.model, messages=messages, **config.params)
+            response = self.client.chat(model=config.model, messages=messages, **params)
             count += 1
 
             if not response:
@@ -782,7 +790,7 @@ class OllamaClient(ProviderClient):
             usage_total_tokens=((response.prompt_eval_count or 0) + (response.eval_count or 0)),
         )
 
-        params_log = dict(config.params)
+        params_log = dict(params)
         params_log.pop("format", None)
         params_log.pop("tools", None)
 
