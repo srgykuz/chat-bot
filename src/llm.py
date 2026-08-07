@@ -137,8 +137,9 @@ class ModelClient:
     Wrapper for interaction with LLM API of any provider.
     The provider and its parameters are loaded from the named configuration in "params.yml" file.
     """
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, use_limiter: bool = True) -> None:
         self.name = name
+        self.use_limiter = use_limiter
         self.settings = get_settings()
         self.provider: ProviderClient = self.create_provider()
 
@@ -188,7 +189,7 @@ class ModelClient:
         if not user_prompt:
             raise RuntimeError("User prompt is required.")
 
-        if src.limiter.should_limit_llm(
+        if self.use_limiter and src.limiter.should_limit_llm(
             self.name,
             config.limits.rpd,
             config.limits.tpd,
@@ -204,8 +205,9 @@ class ModelClient:
         )
         response.content = self.format_assistant_response(response.content)
 
-        src.limiter.track_llm_rpd(self.name)
-        src.limiter.track_llm_tpd(self.name, response.usage_total_tokens)
+        if self.use_limiter:
+            src.limiter.track_llm_rpd(self.name)
+            src.limiter.track_llm_tpd(self.name, response.usage_total_tokens)
 
         return response
 
@@ -238,7 +240,7 @@ class ModelClient:
         if conversation[-1].role != MessageRole.USER:
             raise RuntimeError("The last message in the conversation must be from user.")
 
-        if src.limiter.should_limit_llm(
+        if self.use_limiter and src.limiter.should_limit_llm(
             self.name,
             config.limits.rpd,
             config.limits.tpd,
@@ -257,8 +259,9 @@ class ModelClient:
         )
         response.content = self.format_assistant_response(response.content)
 
-        src.limiter.track_llm_rpd(self.name)
-        src.limiter.track_llm_tpd(self.name, response.usage_total_tokens)
+        if self.use_limiter:
+            src.limiter.track_llm_rpd(self.name)
+            src.limiter.track_llm_tpd(self.name, response.usage_total_tokens)
 
         return response
 
@@ -861,7 +864,7 @@ if __name__ == "__main__":
         )
     ]
 
-    client = ModelClient("chat")
+    client = ModelClient("chat", use_limiter=False)
     response = asyncio.run(
         client.chat(
             system_prompt,
