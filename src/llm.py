@@ -25,6 +25,7 @@ from src.schema import (
     Relationships,
     Tool,
 )
+import src.limiter
 
 
 logger = get_logger(__name__)
@@ -97,6 +98,18 @@ class ProviderClient(ABC):
 
 
 @dataclass(frozen=True, slots=True)
+class ModelConfigLimits:
+    """
+    Rate limits for a model configuration.
+    """
+    rpd: int = 0
+    tpd: int = 0
+
+    def is_valid(self) -> bool:
+        return bool(self.rpd >= 0 and self.tpd >= 0)
+
+
+@dataclass(frozen=True, slots=True)
 class ModelConfig:
     """
     Configuration of LLM API provider.
@@ -104,9 +117,17 @@ class ModelConfig:
     provider: str
     model: str
     params: Dict[str, Any] = field(default_factory=dict)
+    limits: ModelConfigLimits = field(default_factory=ModelConfigLimits)
 
     def is_valid(self) -> bool:
-        return bool(self.provider and self.model)
+        return bool(self.provider and self.model and self.limits.is_valid())
+
+
+class ModelLimitReachedError(Exception):
+    """
+    Raised when a ModelClient usage has reached any of the limits defined in its config.
+    """
+    pass
 
 
 class ModelClient:
@@ -160,8 +181,17 @@ class ModelClient:
         Returns model response. If response_format is provided, content is a JSON string
         which you should parse and validate using Pydantic's model_validate_json().
         """
+        config = self.load_config(self.config_name)
+
         if not user_prompt:
             raise RuntimeError("User prompt is required.")
+
+        if src.limiter.should_limit_llm(
+            self.config_name,
+            config.limits.rpd,
+            config.limits.tpd,
+        ):
+            raise ModelLimitReachedError()
 
         response = await asyncio.to_thread(
             self.provider.generate,
@@ -170,6 +200,9 @@ class ModelClient:
             response_format,
         )
         response.content = self.format_assistant_response(response.content)
+
+        src.limiter.track_llm_rpd(self.config_name)
+        src.limiter.track_llm_tpd(self.config_name, response.usage_total_tokens)
 
         return response
 
@@ -194,11 +227,20 @@ class ModelClient:
         Returns model response. If response_format is provided, content is a JSON string
         which you should parse and validate using Pydantic's model_validate_json().
         """
+        config = self.load_config(self.config_name)
+
         if not conversation:
             raise RuntimeError("Conversation must contain at least one message.")
 
         if conversation[-1].role != MessageRole.USER:
             raise RuntimeError("The last message in the conversation must be from user.")
+
+        if src.limiter.should_limit_llm(
+            self.config_name,
+            config.limits.rpd,
+            config.limits.tpd,
+        ):
+            raise ModelLimitReachedError()
 
         context = [
             Message(role=MessageRole.SYSTEM, content=system_prompt)
@@ -210,6 +252,9 @@ class ModelClient:
             tools,
         )
         response.content = self.format_assistant_response(response.content)
+
+        src.limiter.track_llm_rpd(self.config_name)
+        src.limiter.track_llm_tpd(self.config_name, response.usage_total_tokens)
 
         return response
 
@@ -337,6 +382,11 @@ class ModelClient:
 
         if not isinstance(config, dict):
             raise RuntimeError(f"Config not found: {name}")
+
+        config_limits = config.pop("limits", None)
+
+        if config_limits:
+            config["limits"] = ModelConfigLimits(**config_limits)
 
         model_config = ModelConfig(**config)
 
