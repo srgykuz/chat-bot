@@ -3,9 +3,6 @@ from datetime import datetime, timezone, timedelta
 from src.config import get_redis
 
 
-redis = get_redis()
-
-
 def now() -> datetime:
     """
     Returns current time in UTC timezone.
@@ -35,7 +32,7 @@ def should_limit_llm(name: str, rpd_limit: int, tpd_limit: int) -> bool:
 
     rpd_key = key_llm_rpd(name)
     tpd_key = key_llm_tpd(name)
-    pipe = redis.pipeline()
+    pipe = get_redis().pipeline()
 
     pipe.get(rpd_key)
     pipe.get(tpd_key)
@@ -58,7 +55,7 @@ def track_llm_rpd(name: str):
     Should be called after LLM API request.
     """
     key = key_llm_rpd(name)
-    pipe = redis.pipeline()
+    pipe = get_redis().pipeline()
 
     pipe.incr(key)
     pipe.expire(key, timedelta(days=2), nx=True)
@@ -80,7 +77,7 @@ def track_llm_tpd(name: str, tokens: int):
     Should be called after LLM API request.
     """
     key = key_llm_tpd(name)
-    pipe = redis.pipeline()
+    pipe = get_redis().pipeline()
 
     pipe.incrby(key, tokens)
     pipe.expire(key, timedelta(days=2), nx=True)
