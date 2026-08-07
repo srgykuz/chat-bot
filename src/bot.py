@@ -257,7 +257,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         response = await model_client.chat(system_prompt, history, tools=tools)
         success = True
     except Exception as e:
-        response = ModelResponse(content="Error. Try again later.")
+        response = ModelResponse(content="Error. Try again later.", usage_total_tokens=0)
         success = False
         logger.error("LLM call error: %s", e, exc_info=True)
 

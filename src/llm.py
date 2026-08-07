@@ -42,6 +42,7 @@ class ModelResponse:
     Result of LLM API call.
     """
     content: str
+    usage_total_tokens: int
 
 
 class ProviderClient(ABC):
@@ -385,8 +386,12 @@ class OpenAIClient(ProviderClient):
 
         response = self.client.responses.parse(**params)
         result = ModelResponse(
-            content=(response.output_text or "")
+            content=(response.output_text or ""),
+            usage_total_tokens=0,
         )
+
+        if response.usage:
+            result.usage_total_tokens = response.usage.total_tokens
 
         params_log = dict(params)
         params_log.pop("input", None)
@@ -426,6 +431,7 @@ class OpenAIClient(ProviderClient):
 
         response = None
         count = 0
+        usage_total_tokens = 0
 
         while True:
             if count >= 10:
@@ -434,6 +440,9 @@ class OpenAIClient(ProviderClient):
             response = self.client.chat.completions.parse(**config.params)
             count += 1
             message = response.choices[0].message
+
+            if response.usage:
+                usage_total_tokens += response.usage.total_tokens
 
             if message.tool_calls:
                 if not tools:
@@ -461,7 +470,8 @@ class OpenAIClient(ProviderClient):
                 break
 
         result = ModelResponse(
-            content=(response.choices[0].message.content or "")
+            content=(response.choices[0].message.content or ""),
+            usage_total_tokens=usage_total_tokens,
         )
         params_log = dict(config.params)
 
@@ -515,7 +525,11 @@ class GoogleClient(ProviderClient):
         )
         result = ModelResponse(
             content=(response.text or ""),
+            usage_total_tokens=0,
         )
+
+        if response.usage_metadata:
+            result.usage_total_tokens = response.usage_metadata.total_token_count or 0
 
         logger.info(
             "Google generate: model=%s params=%s usage=%s",
@@ -586,8 +600,12 @@ class GoogleClient(ProviderClient):
 
         response = chat.send_message(curr_message)
         result = ModelResponse(
-            content=(response.text or "")
+            content=(response.text or ""),
+            usage_total_tokens=0,
         )
+
+        if response.usage_metadata:
+            result.usage_total_tokens = response.usage_metadata.total_token_count or 0
 
         logger.info(
             "Google chat: model=%s params=%s usage=%s",
@@ -636,6 +654,7 @@ class OllamaClient(ProviderClient):
         )
         result = ModelResponse(
             content=response.response,
+            usage_total_tokens=((response.prompt_eval_count or 0) + (response.eval_count or 0)),
         )
 
         usage = {
@@ -710,6 +729,7 @@ class OllamaClient(ProviderClient):
 
         result = ModelResponse(
             content=(response.message.content or ""),
+            usage_total_tokens=((response.prompt_eval_count or 0) + (response.eval_count or 0)),
         )
 
         params_log = dict(config.params)
@@ -794,4 +814,5 @@ if __name__ == "__main__":
     )
     result = CalendarEvent.model_validate_json(response.content)
 
-    print(result)
+    print(response)
+    print(result.model_dump_json(indent=2))

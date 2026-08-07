@@ -134,6 +134,7 @@ def perform(chat_id: int) -> None:
 
         response = ModelResponse(
             content=result.message,
+            usage_total_tokens=0
         )
 
         asyncio.run(handle_response(
