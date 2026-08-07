@@ -100,7 +100,7 @@ class ProviderClient(ABC):
 @dataclass(frozen=True, slots=True)
 class ModelConfigLimits:
     """
-    Rate limits for a model configuration.
+    Rate limits for a ModelConfig.
     """
     rpd: int = 0
     tpd: int = 0
@@ -112,7 +112,7 @@ class ModelConfigLimits:
 @dataclass(frozen=True, slots=True)
 class ModelConfig:
     """
-    Configuration of LLM API provider.
+    Configuration of LLM API client.
     """
     provider: str
     model: str
@@ -135,9 +135,9 @@ class ModelClient:
     Wrapper for interaction with LLM API of any provider.
     The provider and its parameters are loaded from the named configuration in "params.yml" file.
     """
-    def __init__(self, config_name: str) -> None:
+    def __init__(self, name: str) -> None:
+        self.name = name
         self.settings = get_settings()
-        self.config_name = config_name
         self.provider: ProviderClient = self.create_provider()
 
     def close(self) -> None:
@@ -153,7 +153,7 @@ class ModelClient:
         The provider is selected based on the loaded config.
         If no supported provider is configured, raises ValueError.
         """
-        config = self.load_config(self.config_name)
+        config = self.load_config(self.name)
 
         if config.provider == "openai":
             return OpenAIClient(self)
@@ -181,13 +181,13 @@ class ModelClient:
         Returns model response. If response_format is provided, content is a JSON string
         which you should parse and validate using Pydantic's model_validate_json().
         """
-        config = self.load_config(self.config_name)
+        config = self.load_config(self.name)
 
         if not user_prompt:
             raise RuntimeError("User prompt is required.")
 
         if src.limiter.should_limit_llm(
-            self.config_name,
+            self.name,
             config.limits.rpd,
             config.limits.tpd,
         ):
@@ -201,8 +201,8 @@ class ModelClient:
         )
         response.content = self.format_assistant_response(response.content)
 
-        src.limiter.track_llm_rpd(self.config_name)
-        src.limiter.track_llm_tpd(self.config_name, response.usage_total_tokens)
+        src.limiter.track_llm_rpd(self.name)
+        src.limiter.track_llm_tpd(self.name, response.usage_total_tokens)
 
         return response
 
@@ -227,7 +227,7 @@ class ModelClient:
         Returns model response. If response_format is provided, content is a JSON string
         which you should parse and validate using Pydantic's model_validate_json().
         """
-        config = self.load_config(self.config_name)
+        config = self.load_config(self.name)
 
         if not conversation:
             raise RuntimeError("Conversation must contain at least one message.")
@@ -236,7 +236,7 @@ class ModelClient:
             raise RuntimeError("The last message in the conversation must be from user.")
 
         if src.limiter.should_limit_llm(
-            self.config_name,
+            self.name,
             config.limits.rpd,
             config.limits.tpd,
         ):
@@ -253,8 +253,8 @@ class ModelClient:
         )
         response.content = self.format_assistant_response(response.content)
 
-        src.limiter.track_llm_rpd(self.config_name)
-        src.limiter.track_llm_tpd(self.config_name, response.usage_total_tokens)
+        src.limiter.track_llm_rpd(self.name)
+        src.limiter.track_llm_tpd(self.name, response.usage_total_tokens)
 
         return response
 
@@ -424,7 +424,7 @@ class OpenAIClient(ProviderClient):
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.config_name)
+        config = self.parent.load_config(self.parent.name)
         params = dict(config.params)
 
         params["model"] = config.model
@@ -461,7 +461,7 @@ class OpenAIClient(ProviderClient):
         response_format: Optional[type[BaseModel]] = None,
         tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.config_name)
+        config = self.parent.load_config(self.parent.name)
 
         messages: List[dict[str, Any]] = [
             {"role": msg.role.value, "content": msg.content}
@@ -557,7 +557,7 @@ class GoogleClient(ProviderClient):
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.config_name)
+        config = self.parent.load_config(self.parent.name)
         params = dict(config.params)
 
         if response_format:
@@ -626,7 +626,7 @@ class GoogleClient(ProviderClient):
             raise ValueError("Last message in context should be from user")
 
         curr_message = last.parts[0].text
-        config = self.parent.load_config(self.parent.config_name)
+        config = self.parent.load_config(self.parent.name)
 
         if response_format and tools and ("gemini-2" in config.model):
             raise RuntimeError("Function calling with Structured output is available only for Gemini 3 models.")
@@ -690,7 +690,7 @@ class OllamaClient(ProviderClient):
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.config_name)
+        config = self.parent.load_config(self.parent.name)
         params = dict(config.params)
 
         if response_format:
@@ -731,7 +731,7 @@ class OllamaClient(ProviderClient):
         response_format: Optional[type[BaseModel]] = None,
         tools: Optional[List[Tool]] = None,
     ) -> ModelResponse:
-        config = self.parent.load_config(self.parent.config_name)
+        config = self.parent.load_config(self.parent.name)
         messages = [
             ollama.Message(role=msg.role.value, content=msg.content)
             for msg in context
