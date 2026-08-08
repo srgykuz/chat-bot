@@ -14,6 +14,7 @@ from src.config import get_logger, get_settings, get_queue
 from src.schema import Message, MessageRole, Persona, Tool
 from src import analytics
 from src import proactivity
+from src import limiter
 
 
 logger = get_logger(__name__)
@@ -198,6 +199,11 @@ async def handle_message(message: TelegramMessage) -> None:
     if not text:
         return
 
+    if limiter.should_limit_chat(chat_id):
+        response = "*Limit reached.*"
+        await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
+        return
+
     persona = session_client.get_persona(chat_id)
     relationships = session_client.get_relationships(chat_id)
 
@@ -260,6 +266,12 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         response = ModelResponse(content="Error. Try again later.", usage_total_tokens=0)
         success = False
         logger.error("LLM call error: %s", e, exc_info=True)
+
+    if success:
+        limiter.track_chat_rpm(chat_id)
+        limiter.track_chat_rpd(chat_id)
+        limiter.track_chat_tpm(chat_id, response.usage_total_tokens)
+        limiter.track_chat_tpd(chat_id, response.usage_total_tokens)
 
     await handle_response(
         chat_id=chat_id,

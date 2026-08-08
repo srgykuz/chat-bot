@@ -91,6 +91,23 @@ class Settings(BaseSettings):
         description="Separator string to split LLM response into multiple messages.",
     )
 
+    limit_chat_rpm: int = Field(
+        default=0,
+        description="Maximum number of requests to LLM per chat allowed per minute.",
+    )
+    limit_chat_rpd: int = Field(
+        default=0,
+        description="Maximum number of requests to LLM per chat allowed per day.",
+    )
+    limit_chat_tpm: int = Field(
+        default=0,
+        description="Maximum number of LLM tokens usage (input + output) per chat allowed per minute.",
+    )
+    limit_chat_tpd: int = Field(
+        default=0,
+        description="Maximum number of LLM tokens usage (input + output) per chat allowed per day.",
+    )
+
 
 def configure_logger() -> None:
     """Configures global logger settings. Should be called once at startup."""
