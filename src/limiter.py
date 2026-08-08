@@ -102,7 +102,7 @@ def should_limit_chat(chat_id: int) -> bool:
     return False
 
 
-def track_llm_rpd(name: str):
+def track_llm_rpd(name: str) -> None:
     """
     Tracks LLM requests per day metric.
 
@@ -124,7 +124,7 @@ def key_llm_rpd(name: str) -> str:
     return f"limiter:llm:{name}:rpd:{date()}"
 
 
-def track_llm_tpd(name: str, tokens: int):
+def track_llm_tpd(name: str, tokens: int) -> None:
     """
     Tracks LLM total tokens usage (input + output) per day metric.
 
@@ -146,7 +146,7 @@ def key_llm_tpd(name: str) -> str:
     return f"limiter:llm:{name}:tpd:{date()}"
 
 
-def track_chat_rpd(chat_id: int):
+def track_chat_rpd(chat_id: int) -> None:
     """
     Tracks chat requests per day metric.
 
@@ -168,7 +168,7 @@ def key_chat_rpd(chat_id: int) -> str:
     return f"limiter:chat:{chat_id}:rpd:{date()}"
 
 
-def track_chat_tpd(chat_id: int, tokens: int):
+def track_chat_tpd(chat_id: int, tokens: int) -> None:
     """
     Tracks chat total tokens usage (input + output) per day metric.
 
@@ -190,7 +190,7 @@ def key_chat_tpd(chat_id: int) -> str:
     return f"limiter:chat:{chat_id}:tpd:{date()}"
 
 
-def track_chat_rpm(chat_id: int):
+def track_chat_rpm(chat_id: int) -> None:
     """
     Tracks chat requests per minute metric.
 
@@ -212,7 +212,7 @@ def key_chat_rpm(chat_id: int) -> str:
     return f"limiter:chat:{chat_id}:rpm:{minute()}"
 
 
-def track_chat_tpm(chat_id: int, tokens: int):
+def track_chat_tpm(chat_id: int, tokens: int) -> None:
     """
     Tracks chat total tokens usage (input + output) per minute metric.
 
