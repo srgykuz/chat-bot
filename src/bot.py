@@ -199,7 +199,7 @@ async def handle_message(message: TelegramMessage) -> None:
     if not text:
         return
 
-    if limiter.should_limit_chat(chat_id):
+    if len(text) > settings.input_max_length or limiter.should_limit_chat(chat_id):
         response = "*Limit reached.*"
         await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
         return

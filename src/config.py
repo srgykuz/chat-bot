@@ -90,6 +90,10 @@ class Settings(BaseSettings):
         default=10,
         description="If length of the user messages buffer equals to or exceedes this value, then the buffered batch is flushed immediately."
     )
+    input_max_length: int = Field(
+        default=5000,
+        description="Maximum length of input text from a user."
+    )
     output_separator: str = Field(
         default="[SPLIT]",
         description="Separator string to split LLM response into multiple messages.",
