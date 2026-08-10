@@ -215,9 +215,10 @@ async def handle_message(message: TelegramMessage) -> None:
     session_client.set_user(chat_id, message.user())
     session_client.set_last_user_message_timestamp(chat_id, message.date or int(time()))
 
-    token = session_client.buffer_message(chat_id, message)
+    flush_token, flush_buf_len = session_client.buffer_message(chat_id, message)
+    flush_force = (flush_buf_len >= settings.chat_flush_threshold)
 
-    enqueue_flush_buffered_messages(chat_id, token)
+    enqueue_flush_buffered_messages(chat_id, flush_token, flush_force)
     enqueue_analytics(chat_id)
     enqueue_proactivity(chat_id)
 
@@ -369,12 +370,17 @@ def calc_typing_duration(text: str, chars_per_second: int = 15) -> float:
     return len(text) / chars_per_second
 
 
-def enqueue_flush_buffered_messages(chat_id: int, token: str) -> None:
+def enqueue_flush_buffered_messages(chat_id: int, token: str, force: bool = False) -> None:
     """
     Schedules execution of `flush_buffered_messages()`.
+
+    If `force = True`, then schedules immediate flushing.
     """
     job_id = f"flush_buffered_messages_{chat_id}_{token}"
     execute_in = timedelta(seconds=settings.chat_flush_interval)
+
+    if force:
+        execute_in = timedelta(seconds=0)
 
     queue.enqueue_in(
         execute_in,

@@ -86,6 +86,10 @@ class Settings(BaseSettings):
         default=5,
         description="Time in seconds to wait for additional user messages before flushing the buffered batch.",
     )
+    chat_flush_threshold: int = Field(
+        default=10,
+        description="If length of the user messages buffer equals to or exceedes this value, then the buffered batch is flushed immediately."
+    )
     output_separator: str = Field(
         default="[SPLIT]",
         description="Separator string to split LLM response into multiple messages.",

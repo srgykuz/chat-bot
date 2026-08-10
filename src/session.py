@@ -2,7 +2,7 @@ import json
 import random
 from datetime import timedelta
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import List, Tuple, Optional, cast
 
 import yaml
 from redis import Redis, WatchError
@@ -332,12 +332,14 @@ class SessionClient:
 
         return int(value)
 
-    def buffer_message(self, chat_id: int, message: TelegramMessage) -> str:
+    def buffer_message(self, chat_id: int, message: TelegramMessage) -> Tuple[str, int]:
         """
         Stores a Telegram message in the per-chat buffer and refreshes its flush token.
 
         Returns new flush token which you should pass in flush_buffered_messages() to
         pop all buffered messages. The token is used for optimistic locaking.
+
+        Second value in return tuple is a new length of the current buffer.
         """
         payload = json.dumps(message.to_dict(), ensure_ascii=False)
         pipe = self.redis.pipeline()
@@ -346,9 +348,10 @@ class SessionClient:
         pipe.incr(self._messages_token_key(chat_id))
 
         result = pipe.execute()
-        token = str(result[-1])
+        length = int(result[0])
+        token = str(result[1])
 
-        return token
+        return token, length
 
     def flush_buffered_messages(self, chat_id: int, flush_token: str) -> Optional[List[TelegramMessage]]:
         """
