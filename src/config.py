@@ -98,6 +98,10 @@ class Settings(BaseSettings):
         default="[SPLIT]",
         description="Separator string to split LLM response into multiple messages.",
     )
+    check_prompt_injection: bool = Field(
+        default=True,
+        description="Enables or disables a primitive check of the prompt injection attack."
+    )
 
     limit_chat_rpm: int = Field(
         default=0,

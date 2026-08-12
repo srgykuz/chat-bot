@@ -11,7 +11,7 @@ from src.session import SessionClient
 from src.weather import fetch_weather, fetch_weather_tool, WeatherInfo, FetchWeatherToolParams
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_logger, get_settings, get_queue
-from src.schema import Message, MessageRole, Persona, Tool
+from src.schema import Message, MessageRole, Persona, Tool, User
 from src import analytics
 from src import proactivity
 from src import limiter
@@ -190,16 +190,16 @@ async def handle_message(message: TelegramMessage) -> None:
     Handles a message that contain plain text a LLM should respond to in the chat context.
     """
     chat_id = message.chat_id
-
-    if not chat_id:
-        return
-
     text = (message.text or "").strip()
+    user = message.user()
 
-    if not text:
+    if not chat_id or not text:
         return
 
-    if len(text) > settings.input_max_length or limiter.should_limit_chat(chat_id):
+    if (
+        len(text) > settings.input_max_length or
+        limiter.should_limit_chat(chat_id)
+    ):
         response = "*Limit reached.*"
         await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
         return
@@ -207,7 +207,10 @@ async def handle_message(message: TelegramMessage) -> None:
     persona = session_client.get_persona(chat_id)
     relationships = session_client.get_relationships(chat_id)
 
-    if persona and relationships and relationships.friendship < persona.block_friendship:
+    if (
+        is_prompt_injection_attack(user) or
+        (persona and relationships and relationships.friendship < persona.block_friendship)
+    ):
         response = "*You have been blocked.*"
         await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
         return
@@ -368,6 +371,32 @@ def calc_typing_duration(text: str, chars_per_second: int = 15) -> float:
         return 0.0
 
     return len(text) / chars_per_second
+
+
+def is_prompt_injection_attack(user: User) -> bool:
+    """
+    Quickly checks if user input data can be considered as a prompt injection attack.
+
+    Note that this function is quite primitive and there is a high chance that it may
+    return false positives and false negatives. This is done on purpose because at the
+    moment the goal is to keep the whole project as simple as possible.
+    """
+    if not settings.check_prompt_injection:
+        return False
+
+    name = f"{user.first_name} {user.last_name}".strip()
+
+    if len(name.split(" ")) > 4:
+        return True
+
+    if max([len(s) for s in name.split(" ")]) > 15:
+        return True
+
+    for tool in build_tools():
+        if tool.name in name:
+            return True
+
+    return False
 
 
 def enqueue_flush_buffered_messages(chat_id: int, token: str, force: bool = False) -> None:
