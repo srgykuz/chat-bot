@@ -277,19 +277,25 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         limiter.track_chat_tpm(chat_id, response.usage_total_tokens)
         limiter.track_chat_tpd(chat_id, response.usage_total_tokens)
 
-    await handle_response(
-        chat_id=chat_id,
-        user_input=user_input,
-        response=response,
-        success=success,
-    )
+    if success:
+        await handle_response(
+            chat_id=chat_id,
+            user_input=user_input,
+            response=response,
+        )
+    else:
+        await telegram_client.send_message(
+            chat_id=chat_id,
+            text=response.content,
+            mode_markdown=True,
+        )
 
 
-async def handle_response(chat_id: int, user_input: list[str], response: ModelResponse, success: bool):
+async def handle_response(chat_id: int, user_input: list[str], response: ModelResponse):
     """
-    Sends model response back to the user in the given chat.
+    Sends successful model response back to the user in the given chat.
 
-    If success, user input and model output are saved in the storage.
+    User input and model output are saved in the storage.
     """
     persona = session_client.get_persona(chat_id)
 
@@ -299,12 +305,11 @@ async def handle_response(chat_id: int, user_input: list[str], response: ModelRe
     output = response.content.split(settings.output_separator)
     output = [s.strip() for s in output if s.strip()]
 
-    if success:
-        for text in user_input:
-            session_client.append_history(chat_id, Message(role=MessageRole.USER, content=text))
+    for text in user_input:
+        session_client.append_history(chat_id, Message(role=MessageRole.USER, content=text))
 
-        for text in output:
-            session_client.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=text))
+    for text in output:
+        session_client.append_history(chat_id, Message(role=MessageRole.ASSISTANT, content=text))
 
     logger.info(f"Responding to chat {chat_id}: {response}")
 
@@ -314,7 +319,7 @@ async def handle_response(chat_id: int, user_input: list[str], response: ModelRe
         delay = calc_typing_duration(text, persona.typing_speed)
         await asyncio.sleep(delay)
 
-        await telegram_client.send_message(chat_id=chat_id, text=text, mode_markdown=(not success))
+        await telegram_client.send_message(chat_id=chat_id, text=text)
 
 
 async def build_system_prompt(chat_id: int) -> str:

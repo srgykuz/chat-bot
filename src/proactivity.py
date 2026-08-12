@@ -141,7 +141,6 @@ def perform(chat_id: int) -> None:
             chat_id=chat_id,
             user_input=[],
             response=response,
-            success=True,
         ))
 
 
