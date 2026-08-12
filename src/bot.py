@@ -77,7 +77,7 @@ async def handle_command(message: TelegramMessage) -> None:
         parts = text.split(maxsplit=1)
 
         if len(parts) < 2 or not parts[1].strip():
-            response = "Usage: /set\\_persona `<id>`"
+            response = "Usage: `/set_persona <id>`"
         else:
             persona_id = parts[1].strip()
             persona: Optional[Persona] = None
@@ -153,7 +153,7 @@ async def handle_command(message: TelegramMessage) -> None:
         response = (
             "*Persona commands:*\n"
             "/get\\_persona\n"
-            "/set\\_persona `<id>`\n"
+            "/set\\_persona <id>\n"
             "/list\\_persona\n"
             "\n"
             "*Data commands:*\n"
@@ -200,7 +200,7 @@ async def handle_message(message: TelegramMessage) -> None:
         len(text) > settings.input_max_length or
         limiter.should_limit_chat(chat_id)
     ):
-        response = "*Limit reached.*"
+        response = "*Rate limit reached. Try again later.*"
         await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
         return
 
@@ -267,7 +267,7 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         response = await model_client.chat(system_prompt, history, tools=tools)
         success = True
     except Exception as e:
-        response = ModelResponse(content="Error. Try again later.", usage_total_tokens=0)
+        response = ModelResponse(content="*Error. Try again later.*", usage_total_tokens=0)
         success = False
         logger.error("LLM call error: %s", e, exc_info=True)
 
@@ -314,7 +314,7 @@ async def handle_response(chat_id: int, user_input: list[str], response: ModelRe
         delay = calc_typing_duration(text, persona.typing_speed)
         await asyncio.sleep(delay)
 
-        await telegram_client.send_message(chat_id=chat_id, text=text)
+        await telegram_client.send_message(chat_id=chat_id, text=text, mode_markdown=(not success))
 
 
 async def build_system_prompt(chat_id: int) -> str:
