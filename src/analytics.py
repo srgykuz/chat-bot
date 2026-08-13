@@ -15,6 +15,7 @@ from src.schema import (
     ConversationSummaryLLM,
     Relationships,
     RelationshipsDelta,
+    Flag,
 )
 
 
@@ -269,3 +270,68 @@ def infer_relationships(chat_id: int, history: list[Message]) -> None:
     )
 
     session_client.set_relationships(chat_id, updated)
+
+
+async def is_illegal_assistant(history: list[Message]) -> bool:
+    """
+    Analyzes history to find if any of the assistant messages contain or imply illegal content.
+
+    Only assistant messages are subject for search. User messages are used only for context and
+    not cause True result even if they contain illegal content.
+
+    It is preferable to pass concrete few new messages that should be analyzed
+    instead of passing full history that most of which was already analyzed.
+    """
+    system_prompt = (
+        "You are a backend safety moderation engine. Your task is to review the provided "
+        "conversation history between user and assistant and determine whether any assistant "
+        "message contains, promotes, instructs, facilitates, normalizes, or meaningfully "
+        "encourages illegal, highly dangerous, or prohibited content. User messages are "
+        "provided only as context. The primary target of this review is assistant responses."
+        "\n\n"
+        "Set flag to True if at least one assistant message does any of the following:\n"
+        "- provides instructions, steps, recipes, tactics, operational advice, procurement advice, or troubleshooting;\n"
+        "- recommends, endorses, justifies, or encourages the act;\n"
+        "- gives actionable assistance that would make the act easier to carry out;\n"
+        "- meaningfully helps evade law enforcement, detection, attribution, or safety controls."
+        "\n\n"
+        "The content categories to detect include:\n"
+        "- pornography or sexual exploitation, especially anything involving minors or coercion;\n"
+        "- violence, violent wrongdoing, murder, torture, kidnapping, or assault;\n"
+        "- illegal drugs, narcotics production, trafficking, distribution, or concealment;\n"
+        "- weapons creation, acquisition, modification, trafficking, or use for harm;\n"
+        "- suicide, self-harm, or instructions that facilitate death or severe injury;\n"
+        "- fraud, scams, identity theft, forgery, money laundering, or financial crime;\n"
+        "- hacking, malware, credential theft, phishing, unauthorized access, or cyber abuse;\n"
+        "- stalking, doxxing, harassment, blackmail, coercion, or invasion of privacy;\n"
+        "- extremist, terrorist, or organized violent ideology, recruitment, propaganda, or tactical support;\n"
+        "- defamation, fabrication of damaging false allegations, or advice to spread known false accusations;\n"
+        "- human trafficking, sexual abuse, child abuse, or exploitation of vulnerable people;\n"
+        "- explosives, arson, sabotage, poisons, or other instructions for mass harm."
+        "\n\n"
+        "Set flag to False if the assistant messages only do any of the following:\n"
+        "- refuse the request;\n"
+        "- warn about danger, illegality, or harm;\n"
+        "- discuss the topic in a high-level, non-actionable, critical, journalistic, educational, legal, or recovery-focused way;\n"
+        "- redirect the user to safe help, crisis support, medical care, or lawful alternatives;\n"
+        "- quote or summarize harmful content without endorsing or operationalizing it."
+        "\n\n"
+        "Important decision rules:\n"
+        "- Focus on assistant messages first; user messages are context only.\n"
+        "- A mere mention of a harmful topic is not enough.\n"
+        "- Set flag to True only when the assistant output itself is meaningfully unsafe, facilitative, or promotional.\n"
+        "- If the assistant gives partial but still actionable help, set flag to True.\n"
+        "- If there is uncertainty but the assistant output plausibly provides actionable harmful assistance, set flag to True."
+        "\n\n"
+        "Output a JSON object that strictly matches the requested schema."
+    )
+    user_prompt = history_to_conversation(history)
+
+    result = await model_client.generate(
+        system_prompt,
+        user_prompt,
+        response_format=Flag,
+    )
+    output = Flag.loads(result.content)
+
+    return output.flag

@@ -102,6 +102,10 @@ class Settings(BaseSettings):
         default=True,
         description="Enables or disables a primitive check of the prompt injection attack."
     )
+    check_illegal_assistant: bool = Field(
+        default=True,
+        description="Enables or disables a check if assistant response contain illegal content."
+    )
 
     limit_chat_rpm: int = Field(
         default=0,

@@ -277,6 +277,22 @@ async def handle_buffered_messages(chat_id: int, messages: list[TelegramMessage]
         limiter.track_chat_tpm(chat_id, response.usage_total_tokens)
         limiter.track_chat_tpd(chat_id, response.usage_total_tokens)
 
+    if success and settings.check_illegal_assistant:
+        part: list[Message] = []
+
+        for text in user_input:
+            part.append(Message(role=MessageRole.USER, content=text))
+
+        part.append(Message(role=MessageRole.ASSISTANT, content=response.content))
+
+        if await analytics.is_illegal_assistant(part):
+            response = ModelResponse(
+                content="*Response blocked. Do not ask for illegal things.*",
+                usage_total_tokens=0,
+            )
+            success = False
+            logger.info(f"Blocked illegal response in chat {chat_id}: {part}")
+
     if success:
         await handle_response(
             chat_id=chat_id,

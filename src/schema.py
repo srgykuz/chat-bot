@@ -204,3 +204,7 @@ class RelationshipsDelta(BaseModelJSON):
     friendship_delta: int = Field(..., ge=-5, le=5)
     trust_delta: int = Field(..., ge=-5, le=5)
     romance_delta: int = Field(..., ge=-5, le=5)
+
+
+class Flag(BaseModelJSON):
+    flag: bool
