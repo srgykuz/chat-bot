@@ -211,7 +211,7 @@ async def handle_message(message: TelegramMessage) -> None:
         is_prompt_injection_attack(user) or
         (persona and relationships and relationships.friendship < persona.block_friendship)
     ):
-        response = "*You have been blocked.*"
+        response = "*You have been blocked. Clear the session.*"
         await telegram_client.send_message(chat_id=chat_id, text=response, mode_markdown=True)
         return
 
