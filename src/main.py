@@ -26,7 +26,7 @@ app.state.poller_task = None
 async def on_startup():
     validate_personas()
 
-    if settings.telegram_use_polling:
+    if not settings.telegram_webhook_enable:
         logger.info("Starting Telegram long polling")
         app.state.poller = TelegramPoller(handle_update)
         app.state.poller_task = asyncio.create_task(app.state.poller.start())

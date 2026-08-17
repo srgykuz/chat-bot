@@ -14,20 +14,20 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=False
+        case_sensitive=False,
     )
 
     telegram_token: str = Field(
         default="",
         description="Telegram bot token from BotFather.",
     )
-    telegram_use_polling: bool = Field(
+    telegram_webhook_enable: bool = Field(
         default=False,
-        description="Use long polling to receive updates instead of expecting webhook endpoint call.",
+        description="Receive bot updates using webhook endpoint call instead of long polling.",
     )
     telegram_webhook_secret_token: str = Field(
         default="",
-        description="Secret token used to authenticate Telegram webhook requests.",
+        description="Secret token used to authenticate webhook requests originating from Telegram.",
     )
 
     google_api_key: str = Field(
@@ -38,27 +38,27 @@ class Settings(BaseSettings):
         default="",
         description="OpenAI API key.",
     )
-    ollama_host: str = Field(
-        default="",
-        description="Ollama host URL (e.g. http://localhost:11434 or https://ollama.com).",
-    )
     ollama_api_key: str = Field(
         default="",
         description="Ollama API key.",
     )
+    ollama_host: str = Field(
+        default="",
+        description="Ollama host URL (e.g. http://localhost:11434 or https://ollama.com).",
+    )
 
-    weatherapi_api_key: str = Field(
+    weather_api_key: str = Field(
         default="",
         description="https://www.weatherapi.com API key.",
     )
-    weatherapi_cache_ttl: int = Field(
+    weather_cache_ttl: int = Field(
         default=15 * 60,
         description="Time in seconds to cache fetched weather info.",
     )
 
     system_path: str = Field(
         default="./system",
-        description="Path to the directory that stores system prompt and model params.",
+        description="Path to the directory that stores system prompt and models params.",
     )
     personas_path: str = Field(
         default="./personas",
@@ -88,11 +88,11 @@ class Settings(BaseSettings):
     )
     chat_flush_threshold: int = Field(
         default=10,
-        description="If length of the user messages buffer equals to or exceedes this value, then the buffered batch is flushed immediately."
+        description="If length of the user messages buffer equals to or exceedes this value, then the buffered batch is flushed immediately.",
     )
     input_max_length: int = Field(
         default=5000,
-        description="Maximum length of input text from a user."
+        description="Maximum length of input text from a user.",
     )
     output_separator: str = Field(
         default="[SPLIT]",
@@ -100,11 +100,11 @@ class Settings(BaseSettings):
     )
     check_prompt_injection: bool = Field(
         default=True,
-        description="Enables or disables a primitive check of the prompt injection attack."
+        description="Enables or disables a primitive check of prompt injection attack.",
     )
     check_illegal_assistant: bool = Field(
         default=True,
-        description="Enables or disables a check if assistant response contain illegal content."
+        description="Enables or disables a check if assistant response contain illegal content.",
     )
 
     limit_chat_rpm: int = Field(
