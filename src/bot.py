@@ -8,7 +8,13 @@ import rq.exceptions
 
 from src.llm import ModelClient, ModelResponse
 from src.session import SessionClient
-from src.weather import fetch_weather, fetch_weather_tool, WeatherInfo, FetchWeatherToolParams
+from src.weather import (
+    is_weather_enabled,
+    fetch_weather,
+    fetch_weather_tool,
+    WeatherInfo,
+    FetchWeatherToolParams,
+)
 from src.telegram import TelegramClient, TelegramMessage, parse_update
 from src.config import get_logger, get_settings, get_queue
 from src.schema import Message, MessageRole, Persona, Tool, User
@@ -354,10 +360,11 @@ async def build_system_prompt(chat_id: int) -> str:
     relationships = session_client.get_relationships(chat_id)
     persona_weather: Optional[WeatherInfo] = None
 
-    try:
-        persona_weather = await fetch_weather(persona.city, lang=persona.language)
-    except Exception as e:
-        logger.error(f"Error fetching weather info: {e}")
+    if is_weather_enabled():
+        try:
+            persona_weather = await fetch_weather(persona.city, lang=persona.language)
+        except Exception as e:
+            logger.error(f"Error fetching weather info: {e}")
 
     system_prompt = model_client.build_system_prompt(
         persona,
@@ -376,12 +383,17 @@ def build_tools() -> list[Tool]:
     """
     Returns a list of available tools for chat LLM call.
     """
-    return [
-        Tool(
-            f=fetch_weather_tool,
-            params=FetchWeatherToolParams,
-        ),
-    ]
+    tools: list[Tool] = []
+
+    if is_weather_enabled():
+        tools.append(
+            Tool(
+                f=fetch_weather_tool,
+                params=FetchWeatherToolParams,
+            )
+        )
+
+    return tools
 
 
 def calc_typing_duration(text: str, chars_per_second: int = 15) -> float:

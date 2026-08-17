@@ -13,6 +13,15 @@ logger = get_logger(__name__)
 redis = get_redis()
 
 
+def is_weather_enabled() -> bool:
+    """
+    Returns True when the Weather API is configured in the settings.
+    """
+    settings = get_settings()
+
+    return bool(settings.weather_api_key.strip())
+
+
 @dataclass(frozen=True, slots=True)
 class WeatherInfo:
     """
