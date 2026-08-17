@@ -99,11 +99,11 @@ class Settings(BaseSettings):
         description="Separator string to split LLM response into multiple messages.",
     )
     check_prompt_injection: bool = Field(
-        default=True,
+        default=False,
         description="Enables or disables a primitive check of prompt injection attack.",
     )
     check_illegal_assistant: bool = Field(
-        default=True,
+        default=False,
         description="Enables or disables a check if assistant response contain illegal content.",
     )
 
