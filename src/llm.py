@@ -265,71 +265,23 @@ class ModelClient:
 
         return response
 
-    def build_system_prompt(
-        self,
-        persona: Persona,
-        user: User,
-        persona_weather: Optional[WeatherInfo] = None,
-        user_facts: Optional[Facts] = None,
-        user_emotional_state: Optional[EmotionalState] = None,
-        conversation_summary: Optional[ConversationSummary] = None,
-        relationships: Optional[Relationships] = None,
-        tools: Optional[List[Tool]] = None,
-    ) -> str:
+    def build_system_prompt(self, context: Dict[str, Any], persona: Persona) -> str:
         """
         Creates a system prompt by loading the template and filling all the
         required placeholders. You should pass returned string as system prompt
         to the chat() method.
         """
-        context = self.build_prompt_context(
-            persona,
-            user,
-            persona_weather=persona_weather,
-            user_facts=user_facts,
-            user_emotional_state=user_emotional_state,
-            conversation_summary=conversation_summary,
-            relationships=relationships,
-            tools=tools,
-        )
-        context["persona_prompt"] = self.build_persona_prompt(
-            persona,
-            user,
-            persona_weather=persona_weather,
-            user_facts=user_facts,
-            user_emotional_state=user_emotional_state,
-            conversation_summary=conversation_summary,
-            relationships=relationships,
-            tools=tools,
-        )
+        context = context.copy()
+        context["persona_prompt"] = self.build_persona_prompt(context, persona)
+
         system_prompt = self.load_system_prompt()
 
         return jinja.from_string(system_prompt).render(context)
 
-    def build_persona_prompt(
-        self,
-        persona: Persona,
-        user: User,
-        persona_weather: Optional[WeatherInfo] = None,
-        user_facts: Optional[Facts] = None,
-        user_emotional_state: Optional[EmotionalState] = None,
-        conversation_summary: Optional[ConversationSummary] = None,
-        relationships: Optional[Relationships] = None,
-        tools: Optional[List[Tool]] = None,
-    ) -> str:
+    def build_persona_prompt(self, context: Dict[str, Any], persona: Persona) -> str:
         """
         Creates a persona-only prompt by rendering the persona template.
         """
-        context = self.build_prompt_context(
-            persona,
-            user,
-            persona_weather=persona_weather,
-            user_facts=user_facts,
-            user_emotional_state=user_emotional_state,
-            conversation_summary=conversation_summary,
-            relationships=relationships,
-            tools=tools,
-        )
-
         return jinja.from_string(persona.prompt).render(context)
 
     def build_prompt_context(

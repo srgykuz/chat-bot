@@ -66,7 +66,7 @@ def perform(chat_id: int) -> None:
             ping_count=0,
         )
 
-    persona_prompt = model_client.build_persona_prompt(
+    context = model_client.build_prompt_context(
         persona,
         user,
         persona_weather=None,
@@ -76,6 +76,7 @@ def perform(chat_id: int) -> None:
         relationships=relationships,
         tools=None,
     )
+    persona_prompt = model_client.build_persona_prompt(context, persona)
     conversation = history_to_conversation(history)
 
     now = time()

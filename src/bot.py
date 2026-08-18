@@ -367,7 +367,7 @@ async def build_system_prompt(chat_id: int) -> str:
         except Exception as e:
             logger.error(f"Error fetching weather info: {e}")
 
-    system_prompt = model_client.build_system_prompt(
+    context = model_client.build_prompt_context(
         persona,
         user,
         persona_weather=persona_weather,
@@ -377,6 +377,7 @@ async def build_system_prompt(chat_id: int) -> str:
         relationships=relationships,
         tools=tools,
     )
+    system_prompt = model_client.build_system_prompt(context, persona)
 
     return system_prompt
 
