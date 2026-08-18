@@ -155,21 +155,25 @@ class Tool(BaseModel):
         return self.f.__name__
 
     @property
+    def doc(self) -> str:
+        return (self.f.__doc__ or "").strip("\n")
+
+    @property
     def description(self) -> str:
-        if not self.f.__doc__:
-            return ""
+        doc = self.doc
 
-        parts = self.f.__doc__.strip("\n").split("\n")
+        if doc:
+            return doc.split("\n")[0]
 
-        return parts[0]
+        return ""
 
     def definition(self, strict: bool = False) -> dict[str, Any]:
         """
         Returns the tool definition suitable for passing into LLM function call.
         """
         d: dict[str, Any] = {
-            "name": self.f.__name__,
-            "description": (self.f.__doc__ or "").strip("\n"),
+            "name": self.name,
+            "description": self.description,
         }
 
         if self.params is ToolNoParams:
