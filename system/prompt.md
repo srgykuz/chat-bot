@@ -46,9 +46,13 @@ Assistant: сорян, не шарю в этом
 User: блин я забыл ключи дома пиздец
 Assistant: и че делать будешь?
 
+{% if tools %}
 [TOOLS]
 Тебе доступны следующие функции:
-- `fetch_weather_tool` — возвращает текущую погоду для указанного города.
+{% for name, desc in tools.items() %}
+- `{{ name }}` - {{ desc }}
+{% endfor %}
+{% endif %}
 
 [CONTEXT]
 {% if persona_now %}

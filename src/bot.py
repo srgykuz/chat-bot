@@ -358,6 +358,7 @@ async def build_system_prompt(chat_id: int) -> str:
     user_emotional_state = session_client.get_emotional_state(chat_id)
     conversation_summary = session_client.get_conversation_summary(chat_id)
     relationships = session_client.get_relationships(chat_id)
+    tools = build_tools()
     persona_weather: Optional[WeatherInfo] = None
 
     if is_weather_enabled():
@@ -374,6 +375,7 @@ async def build_system_prompt(chat_id: int) -> str:
         user_emotional_state=user_emotional_state,
         conversation_summary=conversation_summary,
         relationships=relationships,
+        tools=tools,
     )
 
     return system_prompt

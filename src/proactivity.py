@@ -74,6 +74,7 @@ def perform(chat_id: int) -> None:
         user_emotional_state=None,
         conversation_summary=None,
         relationships=relationships,
+        tools=None,
     )
     conversation = history_to_conversation(history)
 

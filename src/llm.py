@@ -274,6 +274,7 @@ class ModelClient:
         user_emotional_state: Optional[EmotionalState] = None,
         conversation_summary: Optional[ConversationSummary] = None,
         relationships: Optional[Relationships] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> str:
         """
         Creates a system prompt by loading the template and filling all the
@@ -288,6 +289,7 @@ class ModelClient:
             user_emotional_state=user_emotional_state,
             conversation_summary=conversation_summary,
             relationships=relationships,
+            tools=tools,
         )
         context["persona_prompt"] = self.build_persona_prompt(
             persona,
@@ -297,6 +299,7 @@ class ModelClient:
             user_emotional_state=user_emotional_state,
             conversation_summary=conversation_summary,
             relationships=relationships,
+            tools=tools,
         )
         system_prompt = self.load_system_prompt()
 
@@ -311,6 +314,7 @@ class ModelClient:
         user_emotional_state: Optional[EmotionalState] = None,
         conversation_summary: Optional[ConversationSummary] = None,
         relationships: Optional[Relationships] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> str:
         """
         Creates a persona-only prompt by rendering the persona template.
@@ -323,6 +327,7 @@ class ModelClient:
             user_emotional_state=user_emotional_state,
             conversation_summary=conversation_summary,
             relationships=relationships,
+            tools=tools,
         )
 
         return jinja.from_string(persona.prompt).render(context)
@@ -336,6 +341,7 @@ class ModelClient:
         user_emotional_state: Optional[EmotionalState] = None,
         conversation_summary: Optional[ConversationSummary] = None,
         relationships: Optional[Relationships] = None,
+        tools: Optional[List[Tool]] = None,
     ) -> Dict[str, Any]:
         """
         Creates prompt context that can be used to enrich prompt template.
@@ -355,6 +361,7 @@ class ModelClient:
             "persona_weather": persona_weather,
             "conversation_summary": conversation_summary,
             "relationships": relationships,
+            "tools": {t.name: t.description for t in tools} if tools else None,
         }
 
         return context
