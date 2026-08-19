@@ -1,7 +1,9 @@
 services:
   redis:
     image: redis:8.8-alpine
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
       - ./redis_data:/data
     restart: unless-stopped
     logging:
