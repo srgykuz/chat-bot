@@ -363,34 +363,3 @@ class TelegramPoller:
                 still_pending.append(task)
 
         self.pending_tasks = still_pending
-
-
-if __name__ == "__main__":
-    import sys
-
-    async def _main(argv: list[str]) -> None:
-        if len(argv) < 2:
-            raise SystemExit("Usage: python -m src.telegram <setWebhook|deleteWebhook|getWebhookInfo> [url] [secret_token]")
-
-        command = argv[1]
-        response: Dict[str, Any]
-
-        async with TelegramClient() as client:
-            if command == "setWebhook":
-                if len(argv) < 3:
-                    raise SystemExit("Usage: python -m src.telegram setWebhook <url> [secret_token]")
-
-                url = argv[2]
-                secret_token = argv[3] if len(argv) > 3 else None
-
-                response = await client.set_webhook(url=url, secret_token=secret_token)
-            elif command == "deleteWebhook":
-                response = await client.delete_webhook()
-            elif command == "getWebhookInfo":
-                response = await client.get_webhook_info()
-            else:
-                raise SystemExit(f"Unknown command: {command}")
-
-        print(response)
-
-    asyncio.run(_main(sys.argv))
